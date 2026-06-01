@@ -3,13 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-bool running = true;
-int32_t textCurrentColor = 7;
+#include "sprite.h"
+
+static bool running = true;
+static int32_t textCurrentColor = 7;
 
 // ------------------
 //  FONTS 
 // ------------------
-uint32_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
+static uint8_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
   { // SPACE 0
     0,0,0,0,
     0,0,0,0,
@@ -203,7 +205,7 @@ uint32_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
     0,0,0,0
   },
   { // 8  48
-1,1,1,0,
+    1,1,1,0,
     1,0,1,0,
     1,1,1,0,
     1,0,1,0,
@@ -317,9 +319,9 @@ uint32_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
     0,0,0,0
   },
   { // F 20
-1,1,1,0,
-    1,0,0,0,
     1,1,1,0,
+    1,0,0,0,
+    1,1,0,0,
     1,0,0,0,
     1,0,0,0,
     0,0,0,0
@@ -521,8 +523,8 @@ uint32_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
     0,0,0,0,
     0,0,0,0,
     0,0,0,0,
-    0,0,0,0,
-    1,1,1,0
+    1,1,1,0,
+    0,0,0,0
   },
   { // `
     1,0,0,0,
@@ -788,7 +790,8 @@ uint32_t font_texts[FONTCOUNT][FONTWIDTH*FONTHEIGHT] = {
 // ------------------
 //  NANO-8 COLORS [16]
 // ------------------
-Color nano8Color[COLORCOUNT] = {
+
+/*static Color nano8Color[COLORCOUNT] = {
   {0, 0, 0, 255},      // 0 BLACK 
   {29, 43, 83, 255},   // 1 NAVY BLUE 
   {126, 37, 83, 255},  // 2 DARK PURPLE
@@ -806,12 +809,92 @@ Color nano8Color[COLORCOUNT] = {
   {131, 118, 156, 255},// 13 PURPLE-GRAY
   {255, 119, 168, 255},// 14 PINK
   {255, 204, 170, 255} // 15 PEACH
+};*/
+
+static Color nano8Color[COLORCOUNT] = {
+  {20, 12, 28, 255},      // 0 BLACK 
+  {68, 36, 52, 255},   // 1 NAVY BLUE 
+  {48, 52, 109, 255},  // 2 DARK PURPLE
+  {78, 74, 78, 255},   // 3 DARK GREEN 
+  {133, 76, 48, 255},  // 4 BROWN 
+  {52, 101, 36, 255},   // 5 DARK GRAY
+  {210, 170, 153, 255},   // 6 LIGHT GRAY  
+  {222, 238, 214, 255}, // 7 WHITE-ISH
+  
+  {208, 70, 72, 255},   // 8 RED 
+  {210, 125, 44, 255},  // 9 ORANGE 
+  {133, 149, 161, 255}, // 10 YELLOW 
+  {109, 170, 44, 255},   // 11 GREEN 
+  {89, 125, 206, 255}, // 12 BLUE 
+  {109, 194, 202, 255},// 13 PURPLE-GRAY
+  {218, 212, 84, 255},// 14 PINK
+  {117, 113, 97, 255} // 15 PEACH 
+};
+
+// ------------------
+//  ICONS
+// ------------------
+static uint8_t icons[ICONSCOUNT][TILESIZE*TILESIZE] = { 
+  { // code section icon 
+    0x00, 0x3C, 0x42, 0x00, 0x00, 0x42, 0x3C, 0x00
+  },
+  { // sprite section icon 
+    0x00, 0x7E, 0x76, 0x5E, 0x5E, 0x76, 0x7E, 0x00
+  },
+  { // maps section icon 
+    0x00, 0x6E, 0x6E, 0x0E, 0x60, 0x6E, 0x6E, 0x00
+  },
+  { // sfx section icon
+    0x00, 0x18, 0x3C, 0x24, 0x42, 0x42, 0x7E, 0x00
+  },
+  { // mucic section icon
+    0x00, 0x20, 0x70, 0x70, 0x3E, 0x02, 0x04, 0x00
+  },
+  { // pensil icon 
+    0x00, 0x70, 0x48, 0x5C, 0x3E, 0x1E, 0x0E, 0x00
+  },
+  { // select sprite icon
+    0x00, 0x5A, 0x00, 0x42, 0x42, 0x00, 0x5A, 0x00
+  },
+  { // move sprite
+    0x00, 0x3C, 0x70, 0x7E, 0x7E, 0x7E, 0x38, 0x00
+  },
+  { // fill icon
+    0x00, 0x70, 0x10, 0x30, 0x74, 0x38, 0x10, 0x00
+  },
+  { // shape icon (Circle)
+    0x00, 0x18, 0x24, 0x42, 0x42, 0x24, 0x18, 0x00
+  },
+  { // shape icon (square)
+    0x00, 0x7E, 0x42, 0x42, 0x42, 0x42, 0x7E, 0x00
+  },
+  { // shape icon (line)
+    0x00, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x00
+  },
+  { // zoom icon
+    0x00, 0x66, 0x42, 0x00, 0x00, 0x42, 0x66, 0x00
+  },
+  { // right arrow 
+    0x00, 0x00, 0x7E, 0x3C, 0x18, 0x00, 0x00, 0x00
+  },
+  { // left arrow
+    0x00, 0x00, 0x00, 0x18, 0x3C, 0x7E, 0x00, 0x00
+  },
+  { // sprite editor page icon
+    0x00, 0x5E, 0x52, 0x52, 0x5E, 0x00, 0x1A, 0x00
+  },
+  { // sprite viewer page icon
+    0x00, 0x7E, 0x2A, 0x7E, 0x2A, 0x7E, 0x2A, 0x00
+  },
+  { // trash icon
+    0x00, 0x04, 0x7C, 0x46, 0x46, 0x7C, 0x04, 0x00
+  }
 };
 
 // ------------------
 //  SCREEN BUFFER  
 // ------------------
-int32_t Screen[SCREENWIDTH*SCREENHEIGHT];
+static int32_t Screen[SCREENWIDTH*SCREENHEIGHT];
 
 void ClearScreen(int32_t color){
   for(int32_t i=0;i<SCREENWIDTH*SCREENHEIGHT;i++){
@@ -831,6 +914,22 @@ void DrawScreen(void){
     
     //DrawRectangleLines(x, y, SCREENSCALE, SCREENSCALE, GRAY);
     DrawRectangle(x, y, SCREENSCALE, SCREENSCALE, GetNanoColor(Screen[i]));
+  }
+}
+
+void ScrollUpScreen(int32_t amount){
+  for(int32_t y=amount;y<SCREENHEIGHT;y++){
+    for(int32_t x=0;x<SCREENWIDTH;x++){
+      int32_t i = y * SCREENWIDTH + x;
+      Screen[(y - amount) * SCREENWIDTH + x] = Screen[i]; 
+    }
+  }
+
+  // clear bottom area 
+  for(int32_t y = SCREENHEIGHT - amount;y < SCREENHEIGHT;y++){
+    for(int32_t x=0;x<SCREENWIDTH;x++){
+      Screen[y * SCREENWIDTH + x] = 0;
+    }
   }
 }
 
@@ -891,6 +990,23 @@ void DrawCirc(int32_t cx, int32_t cy, int32_t radius, int32_t colorIndex){
   }
 }
 
+uint8_t sget(int32_t x, int32_t y){
+  return GetSprite()[y * SPRITEWIDTH + x].colorIndex;
+}
+
+// for spr function
+void DrawSpr(int32_t sprIndex, int32_t posx, int32_t posy, int32_t width, int32_t height){
+  int32_t sx = sprIndex % (TILESIZE*2) * TILESIZE;
+  int32_t sy = sprIndex / (TILESIZE*2) * TILESIZE;
+  
+  for(int32_t y=0;y<height*TILESIZE;y++){
+    for(int32_t x=0;x<width*TILESIZE;x++){
+      if(sget(sx + x, sy + y))
+        pset(posx+x, posy+y, sget(sx + x, sy + y)); 
+    }
+  }
+}
+
 // ------------------
 //  GAME SYSTEM
 // ------------------
@@ -902,7 +1018,7 @@ bool GameIsRunning(void){
   return running;
 }
 
-uint32_t *GetFontText(const int32_t fontIndex){
+uint8_t *GetFontText(const uint8_t fontIndex){
   return font_texts[fontIndex];
 }
 
@@ -910,7 +1026,7 @@ Color GetNanoColor(int32_t colorIndex){
   return nano8Color[colorIndex];
 }
 
-int32_t GetTextCurrentColor(void){
+int8_t GetTextCurrentColor(void){
   return textCurrentColor;
 }
 
@@ -929,4 +1045,26 @@ Vector2 GetCursorPosition(void){
 void SetCursorPosition(Vector2 position){
   cursorPosition.x = position.x;
   cursorPosition.y = position.y;
+}
+
+void DrawIcons(uint32_t iconIndex, Vector2 position, int32_t colorIndex){ 
+  
+  for(int32_t y=0;y<TILESIZE;y++){
+    unsigned char row = icons[iconIndex][y];
+    for(int32_t x=0;x<TILESIZE;x++){
+      int32_t bit = (row >> (7-x)) & 1;
+
+      if(bit){
+        int32_t newX = y;
+        int32_t newY = 7-x;
+        DrawRectangle(
+          (position.x+newX)*SCREENSCALE, 
+          (position.y+newY)*SCREENSCALE, 
+          SCREENSCALE, 
+          SCREENSCALE, 
+          GetNanoColor(colorIndex)
+        );
+      }
+    }
+  }
 }

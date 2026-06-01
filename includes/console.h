@@ -16,4 +16,5 @@ void UpdateConsole(Console *console);
 void InputConsole(Console *console);
 void DrawConsole(Console *console);
 
+bool CallLuaFunction(const char* funcname);
 #endif

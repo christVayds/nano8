@@ -3,6 +3,7 @@
 #include <raylib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -13,8 +14,9 @@
 #include "draw.h"
 #include "editor.h"
 
-int currentCursorPos = 0;
-int32_t currentCommand = 0;
+static int currentCursorPos = 0;
+
+static void RunLua(void);
 
 static void InsertCharacter(char* line, int32_t pos, char c){
   int32_t len = strlen(line);
@@ -37,11 +39,11 @@ static void BackSpace(char* line, int32_t pos){
 
 // CONSOLE LOG
 #define CONSOLE_LOG_MAX 256
-char console_log[CONSOLE_LOG_MAX][256];
-int32_t consoleLogCount = 0;
+static char console_log[CONSOLE_LOG_MAX][256];
+static int32_t consoleLogCount = 0;
 
 // NEW STATE LUA 
-lua_State *L = NULL;
+static lua_State *L = NULL;
 
 static void PushConsoleLog(const char *text){
   if(consoleLogCount < CONSOLE_LOG_MAX)
@@ -63,47 +65,31 @@ void CloseConsole(){
 }
 
 void UpdateConsole(Console *console){
+  PoolInput();
+
+  Vector2 curPosition = GetCursorPosition();
+
+  if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){
+    //printf("hahahaha\n"); 
+    ScrollUpScreen(FONTHEIGHT * SCREENSCALE);
+    SetCursorPosition((Vector2){curPosition.x, curPosition.y - FONTHEIGHT * SCREENSCALE});
+  }
 
   // get new commad here
   if(console->newCommand){
     // push command to the console log
     PushConsoleLog(console->command);
 
+    Vector2 position = GetCursorPosition();
+
+    // EXIT NANO 8
     if(strcmp(console->command, "exit") == 0){
       GameRunning(0);
     } else if(strcmp(console->command, "run") == 0){
-      Vector2 position = GetCursorPosition();
-      
-      int runCode = luaL_dostring(GetEditorLua(), RunCode());
-
-      // initialze cartridge
-      bool hasInit = true;
-      bool catchError = false;
-      CallLuaFunction(GetEditorLua(), "_init", &hasInit, &catchError);
-       
-      if(runCode != LUA_OK && catchError){
-        printf("error baliw hahahaha\n");
-        // push error message to the console log
-        PushConsoleLog(lua_tostring(GetEditorLua(), -1));
-
-        ChangeTextCurrentColor(8);
-        PrintText(lua_tostring(GetEditorLua(), -1), &position);
-        position.y += FONTHEIGHT;
-        position.x = FONTWIDTH;
-        SetCursorPosition((Vector2){position.x, position.y}); 
-
-        lua_pop(GetEditorLua(), 1);
-
-        SetCartRunning(false);
-        CloseEditor();
-        ResetLuaForEditor();
-      } else {
-        // run card
-        SetCartRunning(true); 
-      }
-    } else {
-      Vector2 position = GetCursorPosition();
-
+      // RUN LUA PROGRAM
+      RunLua();
+    } else { // NANO 8 CONSOLE
+      // LUA ERROR - CONSOLE
       if(luaL_dostring(L, console->command) != LUA_OK){
         
         // push error message to the console log
@@ -126,6 +112,7 @@ void UpdateConsole(Console *console){
 }
 
 void InputConsole(Console *console){
+  if(GetCartIfRunning()) return;
   int key = GetCharPressed();
   if(key >= 32 && console->cursor < 256){
     InsertCharacter(console->buffer, console->cursor, key);
@@ -133,8 +120,7 @@ void InputConsole(Console *console){
     currentCursorPos++;
   }
 
-  if(IsKeyPressed(KEY_BACKSPACE) && console->cursor > 0){
-    //console->buffer[--console->cursor] = '\0';
+  if(IsKeyPressed(KEY_BACKSPACE) && console->cursor > 0){ 
     BackSpace(console->buffer, console->cursor);
     console->cursor--;
     currentCursorPos--;
@@ -163,18 +149,92 @@ void InputConsole(Console *console){
 void DrawConsole(Console *console){
   if(GetCartIfRunning()) return;
 
-  Vector2 position = GetCursorPosition();
-  
-  ChangeTextCurrentColor(6);
+  Vector2 position = GetCursorPosition(); 
 
-  ChangeTextCurrentColor(7);
+  ChangeTextCurrentColor(8);
   PrintText(">", &position);
   position.x += FONTWIDTH;
-  ChangeTextCurrentColor(7); 
+  ChangeTextCurrentColor(6); 
   PrintText(console->buffer, &position);
 
   // draw cursor
   // TODO: FIX THIS SOON
   position.x = FONTWIDTH*3 + (console->cursor * FONTWIDTH);
   GetFont(95, position, true, false);
+}
+
+// RUNNING LUA CODE FROM EDITOR
+
+static void RunLua(void){
+  lua_State *L_editor = GetEditorLua();
+  char *luaCode = GetLuaCode();
+  
+  // load and execute user code 
+  if(luaL_dostring(L_editor, luaCode) != LUA_OK){
+    printf("Lua Error: %s\n", lua_tostring(L_editor, -1));
+
+    Vector2 position = GetCursorPosition();
+    
+    // push error message to the console log
+    PushConsoleLog(lua_tostring(L_editor, -1));
+
+    ChangeTextCurrentColor(8);
+    PrintText(lua_tostring(L_editor, -1), &position);
+    position.y += FONTHEIGHT;
+    position.x = FONTWIDTH;
+    SetCursorPosition((Vector2){position.x, position.y});
+
+    lua_pop(L_editor, 1);
+   
+    SetCartRunning(false);
+    CloseEditor();
+    ResetLuaForEditor();
+    
+    free(luaCode);
+    luaCode = NULL;
+    return;
+  }
+  free(luaCode);
+  luaCode = NULL;
+  
+  SetCartRunning(true);
+  
+  // call init function 
+  CallLuaFunction("_init");
+}
+
+bool CallLuaFunction(const char* funcname){
+  lua_State *L_editor = GetEditorLua();
+  bool funcExist = true;
+
+  lua_getglobal(L_editor, funcname); // push function into stack 
+
+  if(lua_isfunction(L_editor, -1)){
+    Vector2 position = GetCursorPosition();
+
+    // call with 0 atgs and 0 returns
+    if(lua_pcall(L_editor, 0, 0, 0) != LUA_OK){
+      printf("Error in %s: %s\n", funcname, lua_tostring(L_editor, -1));
+      
+      // push error message to the console log
+      PushConsoleLog(lua_tostring(L_editor, -1));
+
+      ChangeTextCurrentColor(8);
+      PrintText(lua_tostring(L_editor, -1), &position);
+      position.y += FONTHEIGHT;
+      position.x = FONTWIDTH;
+      SetCursorPosition((Vector2){position.x, position.y});
+
+      lua_pop(L_editor, 1); 
+     
+      SetCartRunning(false);
+      CloseEditor();
+      ResetLuaForEditor();
+    }
+  } else {
+    lua_pop(L_editor, 1); // not a function, pop it
+    funcExist = false;
+  }
+
+  return funcExist;
 }

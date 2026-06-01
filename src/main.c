@@ -8,18 +8,21 @@
 #include "font.h"
 #include "console.h"
 #include "editor.h"
+#include "sprite.h"
 #include "luaapi.h"
+#include "maps.h"
 
 //#include <emscripten/emscripten.h>
-void UpdateGame(void);
+static void UpdateGame(void);
 
-Scene scene;
+static Scene scene;
 
 int main(){
-  InitWindow(SCREENWIDTH*SCREENSCALE, SCREENHEIGHT*SCREENSCALE, "Nano 8");
+  InitWindow(SCREENWIDTH*SCREENSCALE, SCREENHEIGHT*SCREENSCALE, "Nano 8 - Untitled.n8");
   SetTargetFPS(MAXFPS);
 
   SetExitKey(KEY_NULL);
+  HideCursor();
 
   // ------------------
   //  AUDIO 
@@ -36,6 +39,16 @@ int main(){
   // ------------------
   InitEditor();
   ResetLuaForEditor();
+
+  // ------------------
+  //  SPRITE EDITOR 
+  // ------------------
+  SpriteInit();
+
+  // ------------------
+  //  MAP EDITOR 
+  // ------------------
+  MapInit();
 
   // ------------------
   //  SCENE 
@@ -63,6 +76,8 @@ int main(){
   // ------------------
   CloseConsole();
   CloseEditor();
+  FreeSections();
+  SpriteFree();
   CloseAudioDevice();
   CloseWindow();
 
@@ -72,20 +87,16 @@ int main(){
 // ------------------
 //  UPDATE GAME 
 // ------------------
-void UpdateGame(void){
+static void UpdateGame(void){
   // ------------------
   //  UPDATE GAME 
   // ------------------
   UpdateScene(&scene);        // update scene 
   InputScene(&scene);         // input scene
- 
-  bool hasUpdate = true;
-  bool hasDraw = true;
-  bool errUpdate = true;
-  bool errDraw = true;
-  if(GetCartIfRunning()){
-    CallLuaFunction(GetEditorLua(), "_update", &hasUpdate, &errUpdate);
-  } 
+  
+  bool f_update = false;
+  if(GetCartIfRunning())
+    f_update = CallLuaFunction("_update"); 
 
   // ------------------
   //  DRAW GAME 
@@ -96,17 +107,15 @@ void UpdateGame(void){
   ClearBackground(GetNanoColor(0));
   
   DrawScene(&scene);                // draw scene 
-  if(GetCartIfRunning()){
-    CallLuaFunction(GetEditorLua(), "_draw", &hasDraw, &errDraw);
-  }
+  bool f_draw = false;
+  if(GetCartIfRunning()) f_draw = CallLuaFunction("_draw");
 
-  // check if has update and has draw
-  if((!hasUpdate && !hasDraw) || (errUpdate || errDraw)){
+
+  if(GetCartIfRunning() && (!f_update && !f_draw)){
     SetCartRunning(false);
     CloseEditor();
     ResetLuaForEditor();
   }
-
   //DrawFPS(10, 10);
 
   EndDrawing();

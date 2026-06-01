@@ -9,4 +9,5 @@ void GetFont(const int32_t fontIndex, Vector2 position, bool visibleBlack, bool 
 void PrintText(const char* text, Vector2 *position);
 
 void PrintTextScreen(const char* text, Vector2 *position);
+void DrawTextUI(const char* text, Vector2 position);
 #endif

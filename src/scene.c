@@ -4,6 +4,12 @@
 
 #include "game.h"
 #include "editor.h"
+#include "sprite.h"
+#include "maps.h"
+
+static void DrawSceneUI(Scene *scene);
+static void SwitchScene(Scene *scene, SceneType sceneType, int32_t isDown);
+
 // ------------------
 //  UPDATE SCENE 
 // ------------------
@@ -14,6 +20,12 @@ void UpdateScene(Scene *scene){
       break;
     case SCENE_EDITOR:
       UpdateEditor();
+      break;
+    case SCENE_SPRITE_EDITOR:
+      SpriteUpdate();
+      break;
+    case SCENE_MAP_EDITOR:
+      MapUpdate();
       break;
     default:
       break;
@@ -27,19 +39,29 @@ void InputScene(Scene *scene){
   // GLOBAL SCENE INPUT 
   if(IsKeyPressed(KEY_ESCAPE)){
     switch(scene->sceneType){
-      case SCENE_CONSOLE:
+      case SCENE_CONSOLE:         // go to editor 
         if(GetCartIfRunning()){
           SetCartRunning(false);
           CloseEditor();
           ResetLuaForEditor();
         } else {
           scene->sceneType = SCENE_EDITOR;
+          ShowCursor();
         }
         break;
-      default:
+      default:                    // go to console 
         scene->sceneType = SCENE_CONSOLE;
+        HideCursor();
         break;
     }
+  }
+
+  if(scene->sceneType > SCENE_CONSOLE){
+    SwitchScene(scene, SCENE_EDITOR, IsKeyPressed(KEY_F1));
+    SwitchScene(scene, SCENE_SPRITE_EDITOR, IsKeyPressed(KEY_F2));
+    SwitchScene(scene, SCENE_MAP_EDITOR, IsKeyPressed(KEY_F3));
+    SwitchScene(scene, SCENE_SFX_EDITOR, IsKeyPressed(KEY_F4));
+    SwitchScene(scene, SCENE_MUSIC_EDITOR, IsKeyPressed(KEY_F5));
   }
 
   // PER SCENE INPUT 
@@ -49,6 +71,12 @@ void InputScene(Scene *scene){
       break;
     case SCENE_EDITOR:
       InputEditor();
+      break;
+    case SCENE_SPRITE_EDITOR:
+      SpriteInput();
+      break;
+    case SCENE_MAP_EDITOR:
+      MapInput();
       break;
     default:
       break;
@@ -68,8 +96,36 @@ void DrawScene(Scene *scene){
       break;
     case SCENE_EDITOR:
       DrawEditor();
+      DrawSceneUI(scene);
+      break;
+    case SCENE_SPRITE_EDITOR:
+      SpriteDraw();
+      DrawSceneUI(scene);
+      break;
+    case SCENE_MAP_EDITOR:
+      MapDraw();
+      DrawSceneUI(scene);
       break;
     default:
+      DrawSceneUI(scene);
       break;
+  }
+}
+
+static void DrawSceneUI(Scene *scene){
+  Vector2 position = {88, 0};
+  int32_t iconIndex = 0;
+  for(int32_t i=1;i<=5;i++){ 
+    if((int32_t)scene->sceneType == i)
+      DrawRectangle(position.x*SCREENSCALE, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(8));
+    //DrawRectangleLines(position.x, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, WHITE);
+    DrawIcons(iconIndex++, (Vector2){position.x, position.y}, 6);
+    position.x += TILESIZE;
+  }
+}
+
+static void SwitchScene(Scene *scene, SceneType sceneType, int32_t isDown){
+  if(isDown){
+    scene->sceneType = sceneType;
   }
 }

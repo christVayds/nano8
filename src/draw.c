@@ -5,6 +5,8 @@
 
 #include "game.h"
 
+// NOTE: WHAT THE HELL IS THIS?
+
 // TODO: check this, the limit is 1024?
 DrawTexts drawTexts[1024];
 int textCount = 0;

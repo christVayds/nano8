@@ -3,11 +3,13 @@
 #include <stdio.h>
 #include <stdio.h>
 #include <raylib.h>
-#include "draw.h"
+//#include "draw.h"
 #include "game.h"
 #include "font.h"
 
 #define MAX_LOG 1024
+
+ButtonState buttons[BUTTON_COUNT];
 
 lua_State *InitLuaState(){
   lua_State *L = luaL_newstate();
@@ -22,6 +24,21 @@ lua_State *InitLuaState(){
   lua_register(L, "rectfill", l_rectfill);
   lua_register(L, "circfill", l_circfill);
   lua_register(L, "circ", l_circ);
+  lua_register(L, "btn", l_btn);
+  lua_register(L, "btnp", l_btnp);
+  lua_register(L, "spr", l_spr);
+
+  // GLOBAL VARIABLES
+
+  // KEYS 
+  lua_pushnumber(L, 0); lua_setglobal(L, "K_A");  // K_A = 0
+  lua_pushnumber(L, 1); lua_setglobal(L, "K_S");  // K_S = 1 
+  lua_pushnumber(L, 2); lua_setglobal(L, "K_Z");  // K_Z = 2 
+  lua_pushnumber(L, 3); lua_setglobal(L, "K_X");  // K_X = 3
+  lua_pushnumber(L, 4); lua_setglobal(L, "K_L");  // K_L = 4 (left)
+  lua_pushnumber(L, 5); lua_setglobal(L, "K_R");  // K_R = 5 (right)
+  lua_pushnumber(L, 6); lua_setglobal(L, "K_U");  // K_U = 6 (up)
+  lua_pushnumber(L, 7); lua_setglobal(L, "K_D");  // K_D = 7 (down)
 
   return L;
 }
@@ -36,7 +53,7 @@ int l_print(lua_State *L){
   int posy = luaL_optinteger(L, 3, position.y); // default is 0
   
   int colorIndex = luaL_optinteger(L, 4, 7); // default color is white
-  _DrawText(text, (Vector2){posx, posy}, colorIndex);
+  //_DrawText(text, (Vector2){posx, posy}, colorIndex);
  
   // print/display the text
   ChangeTextCurrentColor(colorIndex);
@@ -138,26 +155,54 @@ int l_circ(lua_State *L){
   return 0;
 }
 
-void CallLuaFunction(lua_State *L, const char* funcname, bool *funcExist, bool *catchErr){
-  lua_getglobal(L, "debug");
-  lua_getfield(L, -1, "traceback");
-  lua_remove(L, -2);
-  int errFunc = lua_gettop(L);
+int l_btn(lua_State *L){
+  int btn = luaL_optinteger(L, 1, 0);
+  if(btn < 0 || btn > BUTTON_COUNT)
+    lua_pushboolean(L, 0);
+  else 
+    lua_pushboolean(L, buttons[btn].current);
+  return 1;
+}
 
-  lua_getglobal(L, funcname); // push function into stack 
+int l_btnp(lua_State *L){
+  int btn = luaL_optinteger(L, 1, 0);
+  if(btn < 0 || btn > BUTTON_COUNT)
+    lua_pushboolean(L, 0);
+  else 
+    lua_pushboolean(L, buttons[btn].current && !buttons[btn].prev);
+  return 1;
+}
 
-  if(lua_isfunction(L, -1)){
-    // call with 0 atgs and 0 returns
-    *catchErr = false;
-    if(lua_pcall(L, 0, LUA_MULTRET, errFunc) != LUA_OK){
-      printf("Error in %s: %s\n", funcname, lua_tostring(L, -1));
-      lua_pop(L, 1); 
-      lua_remove(L, errFunc);
-      *catchErr = true;
-    }
-    *funcExist = true;
+void UpdateButton(Button btn, int isDown){
+  buttons[btn].prev = buttons[btn].current;
+  buttons[btn].current = isDown;
+  if(isDown){
+    buttons[btn].holdFrames++;
   } else {
-    lua_pop(L, 2); // not a function, pop it
-    *funcExist = false;
+    buttons[btn].holdFrames = 0;
   }
+}
+
+void PoolInput(void){
+  UpdateButton(BUTTON_LEFT, IsKeyDown(KEY_LEFT));
+  UpdateButton(BUTTON_RIGHT, IsKeyDown(KEY_RIGHT));
+  UpdateButton(BUTTON_UP, IsKeyDown(KEY_UP));
+  UpdateButton(BUTTON_DOWN, IsKeyDown(KEY_DOWN));
+
+  UpdateButton(BUTTON_A, IsKeyDown(KEY_A));
+  UpdateButton(BUTTON_S, IsKeyDown(KEY_S));
+  UpdateButton(BUTTON_Z, IsKeyDown(KEY_Z));
+  UpdateButton(BUTTON_X, IsKeyDown(KEY_X));
+}
+
+int l_spr(lua_State *L){
+  int sprIndex = luaL_optinteger(L, 1, 0);  // sprite index
+  int posx = luaL_optinteger(L, 2, 0);      // position x 
+  int posy = luaL_optinteger(L, 3, 0);      // position y
+  int width = luaL_optinteger(L, 4, 1);     // width value 
+  int height = luaL_optinteger(L, 5, width);    // height value
+
+  DrawSpr(sprIndex, posx, posy, width, height);
+
+  return 0;
 }

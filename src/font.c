@@ -28,6 +28,32 @@ void PrintTextScreen(const char* text, Vector2 *position){
   }
 }
 
+void DrawTextUI(const char* text, Vector2 position){
+  const int32_t posx = (int32_t)position.x;
+
+  int32_t index = 0;
+  while(true){
+    if(text[index] != '\0'){
+      char c = text[index];
+      int32_t fontIndex = c-32;
+
+      if(c == '\n'){
+        position.y += FONTHEIGHT;
+        position.x = posx;
+        fontIndex = -1;
+      }
+
+      if(fontIndex >= 0){
+        GetFont(fontIndex, position, false, false);
+        position.x += FONTWIDTH;
+      }
+    } else {
+      return;
+    }
+    index++;
+  }
+}
+
 // PRINTING TEXT FOR CONSOLE
 void PrintText(const char* text, Vector2 *position){
   const int32_t posx = (int32_t)position->x;

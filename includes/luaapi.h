@@ -6,6 +6,24 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+typedef enum{
+  BUTTON_A,       //0
+  BUTTON_S,       // 1
+  BUTTON_Z,       // 2
+  BUTTON_X,       // 3
+  BUTTON_LEFT,    // 4
+  BUTTON_RIGHT,   // 5
+  BUTTON_UP,      // 6
+  BUTTON_DOWN,    // 7
+  BUTTON_COUNT    // 8
+} Button;
+
+typedef struct{
+  int current;
+  int prev;
+  int holdFrames;
+} ButtonState;
+
 lua_State *InitLuaState();
 int l_print(lua_State *L);
 int l_cls(lua_State *L);
@@ -16,6 +34,11 @@ int l_rect(lua_State *L);
 int l_rectfill(lua_State *L);
 int l_circfill(lua_State *L);
 int l_circ(lua_State *L);
+int l_btn(lua_State *L);
+int l_btnp(lua_State *L);
+int l_spr(lua_State *L);
 
-void CallLuaFunction(lua_State *L, const char* funcname, bool *funcExist, bool *catchErr);
+void UpdateButton(Button btn, int isDown);
+void PoolInput(void);
+
 #endif
