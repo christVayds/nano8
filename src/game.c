@@ -2,11 +2,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sprite.h"
+#include "maps.h"
 
 static bool running = true;
 static int32_t textCurrentColor = 7;
+static Vector2 camera = {0,0};
+
+// MAP DATA 
+extern int8_t mapData[MAPWIDTH*MAPHEIGHT];
+extern SpriteFlags spriteFlags[16*16];
 
 // ------------------
 //  FONTS 
@@ -830,6 +837,25 @@ static Color nano8Color[COLORCOUNT] = {
   {218, 212, 84, 255},// 14 PINK
   {117, 113, 97, 255} // 15 PEACH 
 };
+static Color nano8ColorDefault[COLORCOUNT]  = {
+  {20, 12, 28, 255},      // 0 BLACK 
+  {68, 36, 52, 255},   // 1 NAVY BLUE 
+  {48, 52, 109, 255},  // 2 DARK PURPLE
+  {78, 74, 78, 255},   // 3 DARK GREEN 
+  {133, 76, 48, 255},  // 4 BROWN 
+  {52, 101, 36, 255},   // 5 DARK GRAY
+  {210, 170, 153, 255},   // 6 LIGHT GRAY  
+  {222, 238, 214, 255}, // 7 WHITE-ISH
+  
+  {208, 70, 72, 255},   // 8 RED 
+  {210, 125, 44, 255},  // 9 ORANGE 
+  {133, 149, 161, 255}, // 10 YELLOW 
+  {109, 170, 44, 255},   // 11 GREEN 
+  {89, 125, 206, 255}, // 12 BLUE 
+  {109, 194, 202, 255},// 13 PURPLE-GRAY
+  {218, 212, 84, 255},// 14 PINK
+  {117, 113, 97, 255} // 15 PEACH 
+};
 
 // ------------------
 //  ICONS
@@ -902,9 +928,15 @@ void ClearScreen(int32_t color){
   }
 }
 
+// set the color of a screen pixel 
 void pset(int32_t x, int32_t y, int32_t colorIndex){
   if(x < 0 || x >= SCREENWIDTH || y < 0 || y >= SCREENHEIGHT) return;
   Screen[y * SCREENWIDTH + x] = colorIndex;
+}
+
+// get the color of a screen pixel 
+int32_t pget(int32_t x, int32_t y){
+  return Screen[y * SCREENWIDTH + x];
 }
 
 void DrawScreen(void){
@@ -931,10 +963,6 @@ void ScrollUpScreen(int32_t amount){
       Screen[y * SCREENWIDTH + x] = 0;
     }
   }
-}
-
-int GetPixelScreenColor(int32_t x, int32_t y){
-  return Screen[y * SCREENWIDTH + x];
 }
 
 void DrawScreenLine(int32_t posx1, int32_t posy1, int32_t posx2, int32_t posy2, int32_t colorIndex){
@@ -1003,6 +1031,92 @@ void DrawSpr(int32_t sprIndex, int32_t posx, int32_t posy, int32_t width, int32_
     for(int32_t x=0;x<width*TILESIZE;x++){
       if(sget(sx + x, sy + y))
         pset(posx+x, posy+y, sget(sx + x, sy + y)); 
+    }
+  }
+}
+
+// draw section of the map 
+void Map(int32_t celX, int32_t celY, int32_t sx, int32_t sy, int32_t celW, int32_t celH){
+  for(int32_t my=0;my<celH;my++){
+    for(int32_t mx=0;mx<celW;mx++){
+      
+      // map position 
+      int32_t mapX = celX + mx;
+      int32_t mapY = celY + my;
+
+      // bounds check 
+      if(mapX < 0 || mapX >= MAPWIDTH || mapY < 0 || mapY > MAPHEIGHT) continue;
+
+      // tile stored in map 
+      int32_t tile = mapData[mapY * MAPWIDTH + mapX];
+
+      // screen position 
+      int32_t drawX = sx + mx * TILESIZE - camera.x;
+      int32_t drawY = sy + my * TILESIZE - camera.y;
+      if(drawX <= -TILESIZE || drawX >= SCREENWIDTH) continue;
+      if(drawY <= -TILESIZE || drawY >= SCREENHEIGHT) continue;
+      DrawSpr(tile, drawX, drawY, 1, 1);
+    }
+  }
+}
+
+// get a tile from a map 
+int32_t MGet(int32_t x, int32_t y){
+  return mapData[y * MAPWIDTH + x];
+}
+
+// set a tile in the map 
+void MSet(int32_t x, int32_t y, int32_t tile){
+  if(tile >= 0 && tile < SPRITEWIDTH*SPRITEWIDTH)
+    mapData[y * MAPWIDTH + x] = tile;
+}
+
+// get a sprite flag
+bool FGet(uint8_t sprite, uint8_t flag){
+  return spriteFlags[sprite].flags[flag];
+}
+
+// set a sprite flag 
+void FSet(int32_t sprite, int32_t flag, int32_t value){
+  spriteFlags[sprite].flags[flag] = value;
+}
+
+// move the camera offset
+void NanoCamera(int32_t x, int32_t y){
+  camera.x = x;
+  camera.y = y;
+}
+
+// replace colors globally (used for effects like night mode, damage, flash, etch.)
+void Pal(int32_t oldColor, int32_t newColor){
+  if(!oldColor && !newColor)
+    memcpy(nano8Color, nano8ColorDefault, 16);
+  else 
+    nano8Color[oldColor] = nano8Color[newColor];
+}
+
+// marks which colors are transparent
+void Palt(int32_t color, bool set, bool reset){
+  if(reset)
+    memcpy(nano8Color, nano8ColorDefault, 16);
+  else 
+    if(set)
+      nano8Color[color] = nano8ColorDefault[0];
+    else
+      nano8Color[color] = nano8ColorDefault[color];
+}
+
+void Sspr(int32_t sx, int32_t sy, int32_t sw, int32_t sh, int32_t dx, int32_t dy, int32_t dw, int32_t dh){
+  for(int32_t y=0;y<dh;y++){
+    for(int32_t x=0;x<dw;x++){
+      // map destination pixel -> source pixel 
+      int32_t srcX = sx + (x * sw) / dw;
+      int32_t srcY = sy + (y * sh) / dh;
+
+      // read from spritesheet 
+      uint8_t color = GetSprite()[srcY * SPRITEWIDTH + srcX].colorIndex;
+      if(color)
+        pset(dx + x, dy + y, color);
     }
   }
 }

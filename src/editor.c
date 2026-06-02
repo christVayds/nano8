@@ -46,9 +46,6 @@ static void BackSpace(int32_t pos);
 static void CountToken(void);
 static void DrawSelection(void);
 
-#define SYMBOLSCOUNT 29
-#define KEYWORDCOUNT 27
-#define FUNCCOUNT 17
 static int isKeyword(const char* str);
 static int isFunc(const char* str);
 static int isSymbol(const char c);
@@ -60,7 +57,7 @@ static const char* kw[] = {
 
 static const char* func[] = {
   "print", "_init", "_update", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr", "rnd",
-  "pset", "pget", "line", "btn", "btnp", "cls" 
+  "pset", "pget", "line", "btn", "btnp", "cls", "map", "mset", "mget", "fget", "fset", "camera", "cursor", "pal", "palt" 
 };
 
 static const char symbols[] = {

@@ -37,6 +37,16 @@ int l_circ(lua_State *L);
 int l_btn(lua_State *L);
 int l_btnp(lua_State *L);
 int l_spr(lua_State *L);
+int l_map(lua_State *L);
+int l_mget(lua_State *L);
+int l_mset(lua_State *L);
+int l_fget(lua_State *L);
+int l_fset(lua_State *L);
+int l_camera(lua_State *L);
+int l_cursor(lua_State *L);
+int l_pal(lua_State *L);
+int l_palt(lua_State *L);
+int l_sspr(lua_State *L);
 
 void UpdateButton(Button btn, int isDown);
 void PoolInput(void);

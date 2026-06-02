@@ -13,6 +13,9 @@
 #define MAXFPS 30             // max fps
 #define TILESIZE 8
 
+#define MAPWIDTH 128
+#define MAPHEIGHT 128
+
 // ------------------
 //  COLORS [16]
 // ------------------
@@ -33,16 +36,26 @@ Color GetNanoColor(int32_t colorIndex);
 void ChangeTextCurrentColor(int32_t colorIndex);
 int8_t GetTextCurrentColor(void);
 
+// for lua functions
 void ClearScreen(int32_t color);
 void pset(int32_t x, int32_t y, int32_t colorIndex);
+int32_t pget(int32_t x, int32_t y);
 uint8_t sget(int32_t x, int32_t y);
 void DrawScreen(void);
-int GetPixelScreenColor(int32_t x, int32_t y);
 void DrawScreenLine(int32_t posx1, int32_t posy1, int32_t posx2, int32_t posy2, int32_t colorIndex);
 void DrawRectFill(int32_t x, int32_t y, int32_t width, int32_t height, int32_t colorIndex);
 void DrawCircFill(int32_t cx, int32_t cy, int32_t radius, int32_t colorIndex);
 void DrawCirc(int32_t cx, int32_t cy, int32_t radius, int32_t colorIndex);
 void DrawSpr(int32_t sprIndex, int32_t posx, int32_t posy, int32_t width, int32_t height);
+void Map(int32_t celX, int32_t celY, int32_t sx, int32_t sy, int32_t celW, int32_t celH);
+void MSet(int32_t x, int32_t y, int32_t tile);
+int32_t MGet(int32_t x, int32_t y);
+bool FGet(uint8_t sprite, uint8_t flag);
+void FSet(int32_t sprite, int32_t flag, int32_t value);
+void NanoCamera(int32_t x, int32_t y);
+void Pal(int32_t oldColor, int32_t newColor);
+void Palt(int32_t color, bool set, bool reset);
+void Sspr(int32_t sx, int32_t sy, int32_t sw, int32_t sh, int32_t dx, int32_t dy, int32_t dw, int32_t dh);
 
 Vector2 GetCursorPosition(void);
 void SetCursorPosition(Vector2 position);

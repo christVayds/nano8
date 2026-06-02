@@ -60,6 +60,8 @@ void UpdateSpriteSheet(Vector2 position);
 void DrawSpriteSheetTabs(Vector2 position);
 void DrawSpriteSheet(Vector2 position);
 void DrawSpriteIndex(Vector2 position);
+void DrawTools(Vector2 position, int32_t distance, bool vertical);
+void UpdateTools(Vector2 position, int32_t distance, bool vertical);
 
 void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor);
 

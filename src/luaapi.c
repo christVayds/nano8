@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdio.h>
 #include <raylib.h>
-//#include "draw.h"
 #include "game.h"
 #include "font.h"
 
@@ -27,6 +26,16 @@ lua_State *InitLuaState(){
   lua_register(L, "btn", l_btn);
   lua_register(L, "btnp", l_btnp);
   lua_register(L, "spr", l_spr);
+  lua_register(L, "map", l_map);
+  lua_register(L, "mset", l_mset);
+  lua_register(L, "mget", l_mget);
+  lua_register(L, "fget", l_fget);
+  lua_register(L, "fset", l_fset);
+  lua_register(L, "camera", l_camera);
+  lua_register(L, "cursor", l_cursor);
+  lua_register(L, "pal", l_pal);
+  lua_register(L, "palt", l_palt);
+  lua_register(L, "sspr", l_sspr);
 
   // GLOBAL VARIABLES
 
@@ -88,7 +97,7 @@ int l_cls(lua_State *L){
 int l_pget(lua_State *L){
   int posx = luaL_optinteger(L, 1, 0);   // x position 
   int posy = luaL_optinteger(L, 2, 0);   // y position 
-  lua_pushinteger(L, GetPixelScreenColor(posx, posy));
+  lua_pushinteger(L, pget(posx, posy));
 
   return 1;
 }
@@ -204,5 +213,104 @@ int l_spr(lua_State *L){
 
   DrawSpr(sprIndex, posx, posy, width, height);
 
+  return 0;
+}
+
+int l_map(lua_State *L){
+  int celX = luaL_checkinteger(L, 1);
+  int celY = luaL_checkinteger(L, 2);
+  int sx = luaL_checkinteger(L, 3);
+  int sy = luaL_checkinteger(L, 4);
+  int celW = luaL_checkinteger(L, 5);
+  int celH = luaL_checkinteger(L, 6);
+
+  Map(celX, celY, sx, sy, celW, celH);
+
+  return 0;
+}
+
+int l_mget(lua_State *L){
+  int x = luaL_checkinteger(L, 1);
+  int y = luaL_checkinteger(L, 2);
+  int mapGet = MGet(x, y);
+  lua_pushinteger(L, mapGet);
+
+  return 1;
+}
+
+int l_mset(lua_State *L){
+  int x = luaL_checkinteger(L, 1);
+  int y = luaL_checkinteger(L, 2);
+  int tile = luaL_checkinteger(L, 3);
+  MSet(x, y, tile);
+  
+  return 0;
+}
+
+int l_fget(lua_State *L){
+  int sprite = luaL_checkinteger(L, 1);
+  int flag = luaL_checkinteger(L, 2);
+  lua_pushboolean(L, FGet(sprite, flag));
+  
+  return 1;
+}
+
+int l_fset(lua_State *L){
+  int sprite = luaL_checkinteger(L, 1);
+  int flag = luaL_checkinteger(L, 2);
+  int value = luaL_checkinteger(L, 3);
+  FSet(sprite, flag, value);
+
+  return 0;
+}
+
+int l_camera(lua_State *L){
+  int x = luaL_optinteger(L, 1, 0);
+  int y = luaL_optinteger(L, 1, 0);
+  NanoCamera(x, y);
+
+  return 0;
+}
+
+// sets where print() starts drawing text
+int l_cursor(lua_State *L){
+  int x = luaL_optinteger(L, 1, 0);
+  int y = luaL_optinteger(L, 2, 0);
+  SetCursorPosition((Vector2){x, y});
+  return 0;
+}
+
+int l_pal(lua_State *L){
+  int oldColor = luaL_optinteger(L, 1, 0);
+  int newColor = luaL_optinteger(L, 2, 0);
+  Pal(oldColor, newColor);
+
+  return 0;
+}
+
+int l_palt(lua_State *L){
+  int argc = lua_gettop(L);
+  if(!argc){
+    Palt(0, 0, true);
+  } else {
+    int color = luaL_checkinteger(L, 1);
+    int set = lua_toboolean(L, 2);
+    Palt(color, set, false);
+  }
+
+  return 0;
+}
+
+int l_sspr(lua_State *L){
+  int sx = luaL_checkinteger(L, 1);
+  int sy = luaL_checkinteger(L, 2);
+  int sw = luaL_checkinteger(L, 3);
+  int sh = luaL_checkinteger(L, 4);
+  int dx = luaL_checkinteger(L, 5);
+  int dy = luaL_checkinteger(L, 6);
+  int dh = luaL_optinteger(L, 7, sw);
+  int dw = luaL_optinteger(L, 8, sw);
+
+  Sspr(sx, sy, sw, sh, dx, dy, dw, dh);
   return 0;
 }

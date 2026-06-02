@@ -9,7 +9,7 @@
 // SPRITE
 Sprite sprites[SPRITEWIDTH*SPRITEHEIGHT];
 SpriteEditor spriteEditor;
-static SpriteFlags spriteFlags[16*16];
+SpriteFlags spriteFlags[16*16];
 
 // pixel selection 
 PixelSelection pixelSelection;
@@ -21,8 +21,6 @@ static void UpdateSpriteEditor(Vector2 position);
 static void DrawSpriteEditor(Vector2 position, int32_t size);
 static void UpdateColorPallete(Vector2 position);
 static void DrawColorPallete(Vector2 position);
-static void UpdateTools(Vector2 position);
-static void DrawTools(Vector2 position);
 static void UpdateSwitch(Vector2 position, SprUIClicked switchUIType);
 static void DrawSwitch(Vector2 position, int32_t index); 
 static void UpdateSpriteFlags(Vector2 position);
@@ -30,7 +28,7 @@ static void DrawSpriteFlags(Vector2 position);
 static void DrawSpriteLabel(Vector2 position);
 static void GetMouseClick(Vector2 position, int32_t width, int32_t height, SprUIClicked sprUI, int32_t index);
 
-static Tools toolClicked = TOOL_PEN;          // current tool used 
+Tools toolClicked;                 // current tool used 
 static int32_t colorIndex = 7;
 static int32_t zoomValue = 0;
 static int32_t pensilSize = 0;
@@ -75,6 +73,7 @@ void SpriteInit(void){
   pixelSelection.active = false;
   pixelSelection.position = (Vector2){0,0};
   pixelSelection.size = (Vector2){0,0};
+  toolClicked = TOOL_PEN;
 }
 
 void SpriteFree(void){
@@ -92,13 +91,14 @@ void SpriteUpdate(void){
   hoveredIndex = -1;
 
   UpdateSpriteEditor((Vector2){16, 12});
-  UpdateTools((Vector2){4, 12});
+  UpdateTools((Vector2){4, 12}, 6, true);
   UpdateColorPallete((Vector2){85, 37});
   UpdateSwitch((Vector2){100, 20}, SPR_UI_PENSIZE);           // pen size update 
   UpdateSwitch((Vector2){100, 30}, SPR_UI_ZOOMSIZE);          // zoom size update
   UpdateSpriteFlags((Vector2){88, 12});
   UpdateSpriteSheet((Vector2){0,88});
 
+  // click buttons
   if(IsMouseButtonPressed(0)){
     switch(hoverUI){
       case SPR_UI_TOOLS:
@@ -185,7 +185,7 @@ void SpriteInput(void){
   TabInput(&showWholeSprite);
 
   int32_t key = GetKeyPressed();
-  if(key >= '1' && key <= '6')
+  if(key >= '1' && key <= '5')
     switch(key){
       case '1': toolClicked = TOOL_PEN; break;
       case '2': toolClicked = TOOL_SELECT; break;
@@ -205,7 +205,7 @@ void SpriteDraw(void){
     // SPRITE EDITOR UI 
     DrawSpriteEditor((Vector2){16, 12}, 64);
     DrawColorPallete((Vector2){85, 37});
-    DrawTools((Vector2){4, 12});
+    DrawTools((Vector2){4, 12}, 6, true);
     DrawSwitch((Vector2){100, 20}, pensilSize);         // pen size 
     DrawSwitch((Vector2){100, 30}, zoomValue);         // zoom size  
     DrawSpriteFlags((Vector2){88, 12});
@@ -227,7 +227,8 @@ void SpriteDraw(void){
 }
 
 static void UpdateSpriteEditor(Vector2 position){
-  GetMouseClick(position, 64, 64, SPR_UI_EDITOR, 0); 
+  GetMouseClick(position, 64, 64, SPR_UI_EDITOR, 0);
+  if(hoverUI != SPR_UI_EDITOR) return;
 
   int32_t gridSize = TILESIZE/spriteEditor.zoom;        // 8=8x8, 4=16x16, 2=32x32, 1=64x64 - how many sprites to draw 
   int32_t spriteSize = TILESIZE*spriteEditor.zoom;      // sprite size base on how many sprite is to draw
@@ -236,6 +237,7 @@ static void UpdateSpriteEditor(Vector2 position){
   int32_t sx = (spriteEditor.activeSpriteIndex % (TILESIZE*2)) * TILESIZE;
   int32_t sy = (spriteEditor.activeSpriteIndex / (TILESIZE*2)) * TILESIZE;
 
+  // FIX THIS
   Vector2 mousePos = GetMousePosition();
   for(int32_t y=0;y<spriteSize;y++){
     for(int32_t x=0;x<spriteSize;x++){
@@ -405,18 +407,17 @@ static void DrawColorPallete(Vector2 position){
 }
 
 // TOOLS
-static void UpdateTools(Vector2 position){
-  int32_t distance = 6;
-
+void UpdateTools(Vector2 position, int32_t distance, bool vertical){
   for(int32_t i=0;i<5;i++){
     GetMouseClick(position, TILESIZE, TILESIZE, SPR_UI_TOOLS, i);
-    position.y+=TILESIZE+distance;
+    if(vertical)
+      position.y+=TILESIZE+distance;
+    else
+      position.x+=TILESIZE+distance;
   }
 }
 
-static void DrawTools(Vector2 position){ 
-  int32_t distance = 6;
-
+void DrawTools(Vector2 position, int32_t distance, bool vertical){
   int32_t icon = 5;
   int32_t color = 6;
   for(int32_t i=0;i<5;i++){
@@ -425,7 +426,11 @@ static void DrawTools(Vector2 position){
       color = 8;
     DrawRectangleLines(position.x*SCREENSCALE, position.y*SCREENSCALE, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(color)); 
     DrawIcons(icon++, (Vector2){position.x, position.y}, color);
-    position.y+=TILESIZE+distance;
+    
+    if(vertical)
+      position.y+=TILESIZE+distance;
+    else
+      position.x+=TILESIZE+distance;
   }
 }
 

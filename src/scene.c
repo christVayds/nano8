@@ -47,6 +47,8 @@ void InputScene(Scene *scene){
         } else {
           scene->sceneType = SCENE_EDITOR;
           ShowCursor();
+          Pal(0,0);
+          Palt(0,0, true);
         }
         break;
       default:                    // go to console 

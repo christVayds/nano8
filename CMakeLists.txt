@@ -27,7 +27,8 @@ set(SOURCES
   src/luaapi.c 
   src/sprite.c
   src/editor.c
-  src/maps.c
+  src/maps.c 
+  src/sfx.c
 )
 
 # Add executable using main.c and the generated lexer.c

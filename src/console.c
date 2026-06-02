@@ -17,39 +17,17 @@
 static int currentCursorPos = 0;
 
 static void RunLua(void);
-
-static void InsertCharacter(char* line, int32_t pos, char c){
-  int32_t len = strlen(line);
-
-  for(int32_t i=len;i>=pos;i--){
-    line[i + 1] = line[i];
-  }
-
-  line[pos] = c;
-}
-
-static void BackSpace(char* line, int32_t pos){
-  if(pos <= 0) return;
-
-  int32_t len = strlen(line);
-  for(int32_t i=pos-1;i<len;i++){
-    line[i] = line[i + 1];
-  }
-}
+static void InsertCharacter(char* line, int32_t pos, char c);
+static void BackSpace(char* line, int32_t pos);
+static void PushConsoleLog(const char *text);
 
 // CONSOLE LOG
-#define CONSOLE_LOG_MAX 256
+#define CONSOLE_LOG_MAX 1024
 static char console_log[CONSOLE_LOG_MAX][256];
 static int32_t consoleLogCount = 0;
 
 // NEW STATE LUA 
 static lua_State *L = NULL;
-
-static void PushConsoleLog(const char *text){
-  if(consoleLogCount < CONSOLE_LOG_MAX)
-    strcpy(console_log[consoleLogCount++], text);
-  else return;
-}
 
 Console InitConsole(void){
   Console newConsole;
@@ -201,6 +179,31 @@ static void RunLua(void){
   
   // call init function 
   CallLuaFunction("_init");
+}
+
+static void InsertCharacter(char* line, int32_t pos, char c){
+  int32_t len = strlen(line);
+
+  for(int32_t i=len;i>=pos;i--){
+    line[i + 1] = line[i];
+  }
+
+  line[pos] = c;
+}
+
+static void BackSpace(char* line, int32_t pos){
+  if(pos <= 0) return;
+
+  int32_t len = strlen(line);
+  for(int32_t i=pos-1;i<len;i++){
+    line[i] = line[i + 1];
+  }
+}
+
+static void PushConsoleLog(const char *text){
+  if(consoleLogCount < CONSOLE_LOG_MAX)
+    strcpy(console_log[consoleLogCount++], text);
+  else return;
 }
 
 bool CallLuaFunction(const char* funcname){

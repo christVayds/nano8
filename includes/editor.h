@@ -15,6 +15,10 @@
 #define VISIBLECOLUMNS 30
 #define TOKENLIMIT 69111
 
+#define SYMBOLSCOUNT 29
+#define KEYWORDCOUNT 27
+#define FUNCCOUNT 26
+
 typedef enum{
   COL_DEFAULT = 6,
   COL_KEYWORD = 8,
