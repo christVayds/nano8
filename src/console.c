@@ -13,6 +13,7 @@
 #include "luaapi.h"
 #include "draw.h"
 #include "editor.h"
+#include "cartridge.h"
 
 static int currentCursorPos = 0;
 
@@ -66,6 +67,26 @@ void UpdateConsole(Console *console){
     } else if(strcmp(console->command, "run") == 0){
       // RUN LUA PROGRAM
       RunLua();
+    } else if(strcmp(console->command, "save") == 0){
+      PushConsoleLog(console->command);
+
+      ChangeTextCurrentColor(8);
+      PrintText("saved", &position);
+      position.y += FONTHEIGHT;
+      position.x = FONTWIDTH;
+      SetCursorPosition((Vector2){position.x, position.y});
+
+      SaveCartridge("untitled.n8");
+    } else if(strcmp(console->command, "load") == 0){
+      PushConsoleLog(console->command);
+
+      ChangeTextCurrentColor(8);
+      PrintText("loaded", &position);
+      position.y += FONTHEIGHT;
+      position.x = FONTWIDTH;
+      SetCursorPosition((Vector2){position.x, position.y});
+
+      LoadCartridge("untitled.n8");
     } else { // NANO 8 CONSOLE
       // LUA ERROR - CONSOLE
       if(luaL_dostring(L, console->command) != LUA_OK){
@@ -80,12 +101,16 @@ void UpdateConsole(Console *console){
         SetCursorPosition((Vector2){position.x, position.y}); 
 
         lua_pop(L, 1);
+      } else {
+        position.y += FONTHEIGHT;
+        position.x = FONTWIDTH;
+        SetCursorPosition((Vector2){position.x, position.y}); 
       }
     }
  
     // clear command buffer  
     memset(console->command, 0, sizeof(console->command));
-    console->newCommand = false;
+    console->newCommand = false; 
   }
 }
 
@@ -113,7 +138,7 @@ void InputConsole(Console *console){
     strcpy(console->command, console->buffer);
     memset(console->buffer, 0, sizeof(console->buffer));
     console->cursor = 0;
-    currentCursorPos = 0;
+    currentCursorPos = 0; 
   }
 
   if(IsKeyPressed(KEY_LEFT) && console->cursor > 0){
@@ -129,9 +154,11 @@ void DrawConsole(Console *console){
 
   Vector2 position = GetCursorPosition(); 
 
-  ChangeTextCurrentColor(8);
-  PrintText(">", &position);
-  position.x += FONTWIDTH;
+  if(!console->newCommand){
+    ChangeTextCurrentColor(8);
+    PrintText(">", &position);
+    position.x += FONTWIDTH;
+  }
   ChangeTextCurrentColor(6); 
   PrintText(console->buffer, &position);
 
@@ -146,6 +173,7 @@ void DrawConsole(Console *console){
 static void RunLua(void){
   lua_State *L_editor = GetEditorLua();
   char *luaCode = GetLuaCode();
+  NanoCameraReset();
   
   // load and execute user code 
   if(luaL_dostring(L_editor, luaCode) != LUA_OK){

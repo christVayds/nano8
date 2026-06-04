@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 // SPRITE
-Sprite sprites[SPRITEWIDTH*SPRITEHEIGHT];
+int8_t sprites[SPRITEWIDTH*SPRITEHEIGHT];
 SpriteEditor spriteEditor;
 SpriteFlags spriteFlags[16*16];
 
@@ -38,19 +38,15 @@ static SprUIClicked hoverUI = SPR_UI_NONE;    // what UI/element user are hovere
 static int32_t hoveredIndex = -1;             // what type of UI are hovered 
 static char labelname[32];                    // to show the label of the UI
 
-Sprite *GetSprite(void){
+int8_t *GetSprite(void){
   return sprites; 
 }
 
 void SpriteInit(void){
   // intitialize sprites 
   for(int32_t i=0;i<SPRITEWIDTH*SPRITEHEIGHT;i++){
-    Sprite sprite = {
-      .colorIndex = 0,
-    }; 
-    
     // push new sprite to sprites
-    sprites[i] = sprite;
+    sprites[i] = 0;
   }
 
   // SPRITE FLAGS and INDEX 
@@ -78,7 +74,7 @@ void SpriteInit(void){
 
 void SpriteFree(void){
   for(int32_t i=0;i<SPRITEWIDTH*SPRITEHEIGHT;i++){
-    sprites[i].colorIndex = 0;
+    sprites[i] = 0;
   }
 
   for(int32_t i=0;i<16*16;i++){
@@ -260,7 +256,7 @@ static void UpdateSpriteEditor(Vector2 position){
               for(int32_t peny=0;peny<pensilSize+1;peny++){
                 for(int32_t penx=0;penx<pensilSize+1;penx++){
                   int32_t nindex = peny * SPRITEWIDTH + penx;
-                  sprites[index+nindex].colorIndex = colorIndex;
+                  sprites[index+nindex] = colorIndex;
                 }
               }
               break;
@@ -279,13 +275,13 @@ static void UpdateSpriteEditor(Vector2 position){
             case TOOL_PAN:
               break;
             case TOOL_FILL:{
-              FloodFill(pixelX, pixelY, sprites[index].colorIndex, colorIndex);
+              FloodFill(pixelX, pixelY, sprites[index], colorIndex);
               break;
             } 
             case TOOL_SHAPE:
               break;
             default:
-              //sprites[index].colorIndex = colorIndex;
+              //sprites[index] = colorIndex;
               break;
           }
         }
@@ -322,7 +318,7 @@ static void DrawSpriteEditor(Vector2 position, int32_t size){
       if(pixelX < 0 || pixelX >= SPRITEWIDTH || pixelY < 0 || pixelY >= SPRITEHEIGHT) continue; 
       
       // draw every pixel of the sprite
-      DrawRectangle(position.x*SCREENSCALE + x * (gridSize*SCREENSCALE), position.y*SCREENSCALE + y * (gridSize*SCREENSCALE), gridSize*SCREENSCALE, gridSize*SCREENSCALE, GetNanoColor(sprites[index].colorIndex)); 
+      DrawRectangle(position.x*SCREENSCALE + x * (gridSize*SCREENSCALE), position.y*SCREENSCALE + y * (gridSize*SCREENSCALE), gridSize*SCREENSCALE, gridSize*SCREENSCALE, GetNanoColor(sprites[index])); 
     }
   }
 
@@ -552,7 +548,7 @@ void DrawSpriteSheet(Vector2 position){
   for(int32_t y=0;y<pageHeight;y++){
     for(int32_t x=0;x<SPRITEWIDTH;x++){
       int32_t index = (pageSY + y) * SPRITEWIDTH + (pageSX + x);
-      int8_t col = sprites[index].colorIndex;
+      int8_t col = sprites[index];
       DrawRectangle((position.x+x)*SCREENSCALE, (position.y+y)*SCREENSCALE, SCREENSCALE, SCREENSCALE, GetNanoColor(col));
     }
   } 
@@ -594,7 +590,7 @@ void DrawSpriteSheetTabs(Vector2 position){
 
 void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor){
   if(targetColor == newColor) return;
-  int32_t spriteSize = TILESIZE * spriteEditor.zoom;   
+  int32_t spriteSize = TILESIZE * spriteEditor.zoom;
 
   int32_t sx = (spriteEditor.activeSpriteIndex % 16) * TILESIZE;
   int32_t sy = (spriteEditor.activeSpriteIndex / 16) * TILESIZE;
@@ -610,8 +606,8 @@ void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t new
 
     if(p.x < 0 || p.x >= spriteSize || p.y < 0 || p.y >= spriteSize) continue;
  
-    if(sprites[index].colorIndex != targetColor) continue;
-    sprites[index].colorIndex = newColor;
+    if(sprites[index] != targetColor) continue;
+    sprites[index] = newColor;
 
     stack[top++] = (Vector2){p.x+1, p.y};
     stack[top++] = (Vector2){p.x-1, p.y};

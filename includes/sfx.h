@@ -27,4 +27,9 @@ typedef struct{
   int32_t field;  // 0=note, 1=instrument, 2=volume, 3=fx
 } SfxCursor;
 
+
+void SfxInit(void);
+void SfxUpdate(void);
+void SfxInput(void);
+void SfxDraw(void);
 #endif

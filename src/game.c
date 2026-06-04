@@ -12,7 +12,7 @@ static int32_t textCurrentColor = 7;
 static Vector2 camera = {0,0};
 
 // MAP DATA 
-extern int8_t mapData[MAPWIDTH*MAPHEIGHT];
+extern int32_t mapData[MAPWIDTH*MAPHEIGHT];
 extern SpriteFlags spriteFlags[16*16];
 
 // ------------------
@@ -930,6 +930,8 @@ void ClearScreen(int32_t color){
 
 // set the color of a screen pixel 
 void pset(int32_t x, int32_t y, int32_t colorIndex){
+  x -= camera.x;
+  y -= camera.y;
   if(x < 0 || x >= SCREENWIDTH || y < 0 || y >= SCREENHEIGHT) return;
   Screen[y * SCREENWIDTH + x] = colorIndex;
 }
@@ -1019,7 +1021,7 @@ void DrawCirc(int32_t cx, int32_t cy, int32_t radius, int32_t colorIndex){
 }
 
 uint8_t sget(int32_t x, int32_t y){
-  return GetSprite()[y * SPRITEWIDTH + x].colorIndex;
+  return GetSprite()[y * SPRITEWIDTH + x];
 }
 
 // for spr function
@@ -1045,14 +1047,14 @@ void Map(int32_t celX, int32_t celY, int32_t sx, int32_t sy, int32_t celW, int32
       int32_t mapY = celY + my;
 
       // bounds check 
-      if(mapX < 0 || mapX >= MAPWIDTH || mapY < 0 || mapY > MAPHEIGHT) continue;
+      if(mapX < 0 || mapX >= MAPWIDTH || mapY < 0 || mapY >= MAPHEIGHT) continue;
 
       // tile stored in map 
       int32_t tile = mapData[mapY * MAPWIDTH + mapX];
 
       // screen position 
-      int32_t drawX = sx + mx * TILESIZE - camera.x;
-      int32_t drawY = sy + my * TILESIZE - camera.y;
+      int32_t drawX = sx + (mx * TILESIZE);
+      int32_t drawY = sy + (my * TILESIZE);
       if(drawX <= -TILESIZE || drawX >= SCREENWIDTH) continue;
       if(drawY <= -TILESIZE || drawY >= SCREENHEIGHT) continue;
       DrawSpr(tile, drawX, drawY, 1, 1);
@@ -1087,6 +1089,11 @@ void NanoCamera(int32_t x, int32_t y){
   camera.y = y;
 }
 
+void NanoCameraReset(void){
+  camera.x = 0;
+  camera.y = 0;
+}
+
 // replace colors globally (used for effects like night mode, damage, flash, etch.)
 void Pal(int32_t oldColor, int32_t newColor){
   if(!oldColor && !newColor)
@@ -1114,7 +1121,7 @@ void Sspr(int32_t sx, int32_t sy, int32_t sw, int32_t sh, int32_t dx, int32_t dy
       int32_t srcY = sy + (y * sh) / dh;
 
       // read from spritesheet 
-      uint8_t color = GetSprite()[srcY * SPRITEWIDTH + srcX].colorIndex;
+      uint8_t color = GetSprite()[srcY * SPRITEWIDTH + srcX];
       if(color)
         pset(dx + x, dy + y, color);
     }
@@ -1138,6 +1145,16 @@ uint8_t *GetFontText(const uint8_t fontIndex){
 
 Color GetNanoColor(int32_t colorIndex){
   return nano8Color[colorIndex];
+}
+
+void SetNanoColor(int32_t colorIndex, int32_t r, int32_t g, int32_t b){
+  nano8Color[colorIndex].r = r;
+  nano8Color[colorIndex].g = g;
+  nano8Color[colorIndex].b = b;
+
+  nano8ColorDefault[colorIndex].r = r;
+  nano8ColorDefault[colorIndex].g = g;
+  nano8ColorDefault[colorIndex].b = b;
 }
 
 int8_t GetTextCurrentColor(void){

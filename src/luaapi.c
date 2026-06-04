@@ -1,8 +1,10 @@
 #include "luaapi.h"
 
 #include <stdio.h>
-#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <raylib.h>
+#include <math.h>
 #include "game.h"
 #include "font.h"
 
@@ -36,6 +38,16 @@ lua_State *InitLuaState(){
   lua_register(L, "pal", l_pal);
   lua_register(L, "palt", l_palt);
   lua_register(L, "sspr", l_sspr);
+  lua_register(L, "flr", l_flr);
+  lua_register(L, "abs", l_abs);
+  lua_register(L, "ciel", l_ciel);
+  lua_register(L, "sqrt", l_sqrt);
+  lua_register(L, "sin", l_sin);
+  lua_register(L, "cos", l_cos);
+  lua_register(L, "rand", l_rand);
+  lua_register(L, "srand", l_srand);
+  lua_register(L, "min", l_min);
+  lua_register(L, "max", l_max);
 
   // GLOBAL VARIABLES
 
@@ -61,15 +73,11 @@ int l_print(lua_State *L){
   int posx = luaL_optinteger(L, 2, position.x); // default is 0
   int posy = luaL_optinteger(L, 3, position.y); // default is 0
   
-  int colorIndex = luaL_optinteger(L, 4, 7); // default color is white
-  //_DrawText(text, (Vector2){posx, posy}, colorIndex);
+  int colorIndex = luaL_optinteger(L, 4, 7); // default color is white 
  
   // print/display the text
   ChangeTextCurrentColor(colorIndex);
   PrintTextScreen(text, &(Vector2){posx, posy});
-  posy += FONTHEIGHT;
-  posx = FONTWIDTH;
-  SetCursorPosition((Vector2){posx, posy});
 
   return 0;
 }
@@ -266,7 +274,7 @@ int l_fset(lua_State *L){
 
 int l_camera(lua_State *L){
   int x = luaL_optinteger(L, 1, 0);
-  int y = luaL_optinteger(L, 1, 0);
+  int y = luaL_optinteger(L, 2, 0);
   NanoCamera(x, y);
 
   return 0;
@@ -313,4 +321,68 @@ int l_sspr(lua_State *L){
 
   Sspr(sx, sy, sw, sh, dx, dy, dw, dh);
   return 0;
+}
+
+int l_flr(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushinteger(L, (int)x);
+  return 1;
+}
+
+int l_abs(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushinteger(L, (x < 0) ? -x : x);
+  return 1;
+}
+
+int l_ciel(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  int i = (int)x;
+  lua_pushinteger(L, (x > i) ? i + 1 : i);
+
+  return 1;
+}
+
+int l_sqrt(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushnumber(L, sqrtf(x));
+  return 1;
+}
+
+int l_sin(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushnumber(L, sinf(x * 2.0f * M_PI));
+  return 1;
+}
+
+int l_cos(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushnumber(L, cosf(x * 2.0f * M_PI));
+  return 1;
+}
+
+int l_rand(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  lua_pushnumber(L, ((float)rand() / RAND_MAX) * x);
+  return 1;
+}
+
+int l_srand(lua_State *L){
+  float seed = luaL_checknumber(L, 1);
+  srand(seed);
+  return 0;
+}
+
+int l_min(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  float y = luaL_checknumber(L, 2);
+  lua_pushnumber(L, (x < y ? x : y));
+  return 1;
+}
+
+int l_max(lua_State *L){
+  float x = luaL_checknumber(L, 1);
+  float y = luaL_checknumber(L, 2);
+  lua_pushnumber(L, (x > y ? x : y));
+  return 1;
 }

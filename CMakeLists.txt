@@ -29,6 +29,7 @@ set(SOURCES
   src/editor.c
   src/maps.c 
   src/sfx.c
+  src/cartridge.c
 )
 
 # Add executable using main.c and the generated lexer.c

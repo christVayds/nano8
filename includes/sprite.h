@@ -5,14 +5,6 @@
 #include <stdint.h>
 #include <raylib.h>
 
-#define SPRITEWIDTH 128
-#define SPRITEHEIGHT 128
-#define FLAGCOUNT 7
-
-typedef struct{
-  int8_t colorIndex;
-} Sprite;
-
 typedef struct{
   int32_t spriteIndex;
   int8_t *flags;
@@ -55,7 +47,7 @@ void SpriteUpdate(void);
 void TabInput(int32_t *showTab);
 void SpriteInput(void);
 void SpriteDraw(void);
-Sprite *GetSprite(void);
+int8_t *GetSprite(void);
 void UpdateSpriteSheet(Vector2 position);
 void DrawSpriteSheetTabs(Vector2 position);
 void DrawSpriteSheet(Vector2 position);

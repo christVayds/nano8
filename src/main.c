@@ -11,6 +11,7 @@
 #include "sprite.h"
 #include "luaapi.h"
 #include "maps.h"
+#include "sfx.h"
 
 //#include <emscripten/emscripten.h>
 static void UpdateGame(void);
@@ -39,6 +40,8 @@ int main(){
   // ------------------
   InitEditor();
   ResetLuaForEditor();
+  //const char* startUpCode = "-- your first Nano-8 lua code\nfunction _init()\n\nend\n\nfunction _update()\n\nend\n\nfunction _draw()\n  cls()\n  print(\"hello Nano-8\")\nend";
+  //LoadCode(startUpCode, strlen(startUpCode)); 
 
   // ------------------
   //  SPRITE EDITOR 
@@ -49,6 +52,11 @@ int main(){
   //  MAP EDITOR 
   // ------------------
   MapInit();
+
+  // ------------------
+  //  SFX EDITOR 
+  // ------------------
+  SfxInit();
 
   // ------------------
   //  SCENE 

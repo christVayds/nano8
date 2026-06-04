@@ -48,6 +48,17 @@ int l_pal(lua_State *L);
 int l_palt(lua_State *L);
 int l_sspr(lua_State *L);
 
+int l_flr(lua_State *L);
+int l_abs(lua_State *L);
+int l_ciel(lua_State *L);
+int l_sqrt(lua_State *L);
+int l_sin(lua_State *L);
+int l_cos(lua_State *L);
+int l_rand(lua_State *L);
+int l_srand(lua_State *L);
+int l_min(lua_State *L);
+int l_max(lua_State *L);
+
 void UpdateButton(Button btn, int isDown);
 void PoolInput(void);
 

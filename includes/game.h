@@ -13,8 +13,14 @@
 #define MAXFPS 30             // max fps
 #define TILESIZE 8
 
+// MAPS
 #define MAPWIDTH 128
 #define MAPHEIGHT 128
+
+// SPRITE 
+#define SPRITEWIDTH 128
+#define SPRITEHEIGHT 128
+#define FLAGCOUNT 7
 
 // ------------------
 //  COLORS [16]
@@ -33,6 +39,7 @@ void GameRunning(bool run);
 bool GameIsRunning(void);
 uint8_t *GetFontText(const uint8_t fontIndex);
 Color GetNanoColor(int32_t colorIndex);
+void SetNanoColor(int32_t colorIndex, int32_t r, int32_t g, int32_t b);
 void ChangeTextCurrentColor(int32_t colorIndex);
 int8_t GetTextCurrentColor(void);
 
@@ -53,6 +60,7 @@ int32_t MGet(int32_t x, int32_t y);
 bool FGet(uint8_t sprite, uint8_t flag);
 void FSet(int32_t sprite, int32_t flag, int32_t value);
 void NanoCamera(int32_t x, int32_t y);
+void NanoCameraReset(void);
 void Pal(int32_t oldColor, int32_t newColor);
 void Palt(int32_t color, bool set, bool reset);
 void Sspr(int32_t sx, int32_t sy, int32_t sw, int32_t sh, int32_t dx, int32_t dy, int32_t dw, int32_t dh);

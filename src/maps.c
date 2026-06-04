@@ -5,10 +5,10 @@
 #include "game.h"
 #include "sprite.h"
 
-int8_t mapData[MAPWIDTH*MAPHEIGHT];
+int32_t mapData[MAPWIDTH*MAPHEIGHT];
 static MapEditor mapEditor;
 
-extern Sprite sprites[SPRITEWIDTH*SPRITEHEIGHT];
+extern int8_t sprites[SPRITEWIDTH*SPRITEHEIGHT];
 extern SpriteEditor spriteEditor;
 extern Tools toolClicked;                 // current tool used 
 
@@ -215,13 +215,13 @@ static void DrawMapTiles(Vector2 position, int32_t tileIndex){
       int32_t index = pixelY * SPRITEWIDTH + pixelX;
       
       // draw every pixel of the sprite
-      if(sprites[index].colorIndex)
+      if(sprites[index])
         DrawRectangle(
           (position.x+x*pSize) * SCREENSCALE,
           (position.y+y*pSize) * SCREENSCALE,
           pSize*SCREENSCALE, 
           pSize*SCREENSCALE, 
-          GetNanoColor(sprites[index].colorIndex)
+          GetNanoColor(sprites[index])
         ); 
     }
   }

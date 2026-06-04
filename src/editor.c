@@ -56,8 +56,9 @@ static const char* kw[] = {
 };
 
 static const char* func[] = {
-  "print", "_init", "_update", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr", "rnd",
-  "pset", "pget", "line", "btn", "btnp", "cls", "map", "mset", "mget", "fget", "fset", "camera", "cursor", "pal", "palt" 
+  "print", "_init", "_update", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr",
+  "pset", "pget", "line", "btn", "btnp", "cls", "map", "mset", "mget", "fget", "fset", "camera", "cursor", "pal", "palt", 
+  "flr", "abs", "ciel", "sqrt", "sin", "cos", "rand", "srand", "min", "max"
 };
 
 static const char symbols[] = {
@@ -87,13 +88,21 @@ lua_State *GetEditorLua(void){
   return L_editor;
 }
 
-char *GetLuaCode(void){ 
-  char *code = malloc(sizeof(char) * TEXTSIZE);
+// NOTE: can memory leak
+char *GetLuaCode(void){  
+  char *code = malloc(sizeof(char));
+  int32_t codeSize = (int32_t)sizeof(char);
   if(!code) return NULL;
 
   code[0] = '\0';
   char *ptr = code;
   for(int32_t i=0;i<=sections.sectionsCount;i++){
+    codeSize += sections.codeEditor[i].codeCount +2;
+    code = realloc(code, codeSize * sizeof(char));
+    if(!code) return NULL;
+    ptr = code + strlen(code);
+
+    // write 
     int write = sprintf(ptr, "%s\n", sections.codeEditor[i].code);
     ptr += write;
   }
@@ -101,8 +110,33 @@ char *GetLuaCode(void){
   return code;
 }
 
+char *GetLuaCodeInSection(int32_t si){
+  // si = section index
+  char *code = malloc(sizeof(char) * sections.codeEditor[si].codeCount +2);
+  if(!code) return NULL;
+
+  code[0] = '\0';
+  char *ptr = code;
+
+  // write 
+  int write = sprintf(ptr, "%s\n", sections.codeEditor[si].code);
+  ptr += write;
+
+  return code;
+}
+
+// load a lua code
+void LoadCode(const char* luaCode, size_t size){
+  CodeEditor *codeEditor = &sections.codeEditor[sections.sectionCurrent];
+  
+  memcpy(codeEditor->code + codeEditor->codeCount, luaCode, sizeof(char) * size);
+  codeEditor->codeCount += size;
+  codeEditor->code[codeEditor->codeCount] = '\0';
+}
+
 void UpdateEditor(void){
-  // SOON
+  
+  // always count token
   CountToken();
 }
 
@@ -424,6 +458,7 @@ void InputEditor(void){
 
   if(codeEditor->cursorColumn >= codeEditor->scrollX + VISIBLECOLUMNS) codeEditor->scrollX = codeEditor->cursorColumn - VISIBLECOLUMNS + 1;
   if(codeEditor->cursorColumn < codeEditor->scrollX) codeEditor->scrollX = codeEditor->cursorColumn; 
+ 
 }
 
 void DrawEditor(void){
@@ -620,10 +655,6 @@ static void DrawTextEditor(Vector2 *position){
       position->x += FONTWIDTH;
     }
 
-    //if(fontIndex >= 0){
-    //  DrawFont(fontIndex, *position);
-    //  position->x += FONTWIDTH;
-    //}
     index++;
   }
 }
@@ -700,15 +731,12 @@ static void BackSpace(int32_t pos){
   codeEditor->codeCount--;
 }
 
+// NOTE: FIX THIS SOON
 void InitSection(void){
   sections.sectionsCount = 0;
   sections.sectionCurrent = 0;
-  sections.codeEditor = malloc(sizeof(CodeEditor)); 
-  
-  if(!sections.codeEditor){
-    printf("Memory Allocation failed\n");
-    return;
-  }
+  sections.codeEditor = malloc(sizeof(CodeEditor));  
+  if(!sections.codeEditor){ printf("Memory Allocation failed\n"); return; }
 
   // set section's code cursor
   sections.codeEditor[sections.sectionCurrent].cursor = 0;
@@ -730,16 +758,7 @@ void InitSection(void){
   sections.codeEditor[sections.sectionsCount].code[0] = '\0';
 }
 
-void FreeSections(void){
-  for(int32_t i=0;i<=sections.sectionsCount;i++){
-    free(sections.codeEditor[i].code);
-    sections.codeEditor[i].code = NULL;
-  }
-
-  free(sections.codeEditor);
-  sections.codeEditor = NULL; 
-}
-
+// CREATE NEW SECTION
 void NewSection(void){ 
   // increase section count 
   sections.sectionsCount++;
@@ -767,6 +786,20 @@ void NewSection(void){
     return;
   } 
   sections.codeEditor[sections.sectionsCount].code[0] = '\0';  
+}
+
+void FreeSections(void){
+  for(int32_t i=0;i<=sections.sectionsCount;i++){
+    free(sections.codeEditor[i].code);
+    sections.codeEditor[i].code = NULL;
+  }
+
+  free(sections.codeEditor);
+  sections.codeEditor = NULL; 
+}
+
+int32_t GetEditorSectionCount(void){
+  return sections.sectionsCount;
 }
 
 // TODO: do this

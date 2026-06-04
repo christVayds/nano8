@@ -6,6 +6,7 @@
 #include "editor.h"
 #include "sprite.h"
 #include "maps.h"
+#include "sfx.h"
 
 static void DrawSceneUI(Scene *scene);
 static void SwitchScene(Scene *scene, SceneType sceneType, int32_t isDown);
@@ -26,6 +27,9 @@ void UpdateScene(Scene *scene){
       break;
     case SCENE_MAP_EDITOR:
       MapUpdate();
+      break;
+    case SCENE_SFX_EDITOR:
+      SfxUpdate();
       break;
     default:
       break;
@@ -80,6 +84,9 @@ void InputScene(Scene *scene){
     case SCENE_MAP_EDITOR:
       MapInput();
       break;
+    case SCENE_SFX_EDITOR:
+      SfxInput();
+      break;
     default:
       break;
   }
@@ -106,6 +113,10 @@ void DrawScene(Scene *scene){
       break;
     case SCENE_MAP_EDITOR:
       MapDraw();
+      DrawSceneUI(scene);
+      break;
+    case SCENE_SFX_EDITOR:
+      SfxDraw();
       DrawSceneUI(scene);
       break;
     default:

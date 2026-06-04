@@ -17,7 +17,7 @@
 
 #define SYMBOLSCOUNT 29
 #define KEYWORDCOUNT 27
-#define FUNCCOUNT 26
+#define FUNCCOUNT 35
 
 typedef enum{
   COL_DEFAULT = 6,
@@ -55,6 +55,8 @@ void ResetLuaForEditor(void);
 void CloseEditor(void);
 lua_State *GetEditorLua(void);
 char* GetLuaCode(void);
+char* GetLuaCodeInSection(int32_t si);
+void LoadCode(const char* luaCode, size_t size);
 void UpdateEditor(void);
 void InputEditor(void);
 void DrawEditor(void);
@@ -66,6 +68,7 @@ void SetCartRunning(bool set);
 void InitSection(void);
 void FreeSections(void);
 void NewSection(void);
-void RemoveSection(void);
+int32_t GetEditorSectionCount(void);
+void RemoveSection(void);             // NOTE: Not implemented yet
 
 #endif
