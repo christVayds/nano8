@@ -16,8 +16,8 @@
 #define TOKENLIMIT 69111
 
 #define SYMBOLSCOUNT 29
-#define KEYWORDCOUNT 27
-#define FUNCCOUNT 35
+#define KEYWORDCOUNT 28
+#define FUNCCOUNT 36
 
 typedef enum{
   COL_DEFAULT = 6,

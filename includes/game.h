@@ -26,7 +26,7 @@
 //  COLORS [16]
 // ------------------
 #define COLORCOUNT 16
-#define ICONSCOUNT 18
+#define ICONSCOUNT 28
 
 // ------------------
 //  TEXT/FONT CHARACTERS

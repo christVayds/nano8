@@ -4,23 +4,30 @@
 #include <stdint.h>
 #include "game.h"
 #include "sprite.h"
+#include "nanoUI.h"
 
-int32_t mapData[MAPWIDTH*MAPHEIGHT];
+int8_t mapData[MAPWIDTH*MAPHEIGHT];
 static MapEditor mapEditor;
 
 extern int8_t sprites[SPRITEWIDTH*SPRITEHEIGHT];
 extern SpriteEditor spriteEditor;
-extern Tools toolClicked;                 // current tool used 
+extern Tools toolClicked;                     // current tool used                         (sprite.c)
+extern SprUIClicked hoverUI;                  // what UI/element user are hovered in mouse (sprite.c)
+extern int32_t hoveredIndex;                  // what type of UI are hovered               (sprite.c)
+extern char labelname[32];                    // to show the label of the UI               (sprite.c)
 
 static int32_t viewPortWidth = 512;
 static int32_t viewPortHeight = 256;
+
+// BUTTONS 
+static NanoButton mapEditorPage;
+static NanoButton mapFullPage;
 
 // static functions for drawing and updates 
 static void UpdateMapEditor(Vector2 position);
 static void DrawMapEditor(Vector2 position);
 static void DrawSpriteSelector(Vector2 position);
 static void DrawMapTiles(Vector2 position, int32_t tileIndex);
-static void MapSet(int32_t mapIndex, int32_t spriteIndex);
 
 static bool showGrid = false;
 
@@ -37,9 +44,15 @@ void MapInit(void){
       mapData[index] = -1;
     }
   }
+
+  // INITIALIZE BUTTONS 
+  InitNanoButtonIcon(&mapEditorPage, (Rectangle){0, 0, TILESIZE, TILESIZE}, "Map Editor", 15, false);
+  InitNanoButtonIcon(&mapFullPage, (Rectangle){TILESIZE, 0, TILESIZE, TILESIZE}, "Map full view", 16, false);
 }
 
-void MapUpdate(void){ 
+void MapUpdate(void){
+  hoverUI = SPR_UI_NONE;
+  hoveredIndex = -1;
   
   // update sprite selector only if showSelector is true 
   if(mapEditor.showSelector){
@@ -49,6 +62,46 @@ void MapUpdate(void){
 
   // update the map editor
   UpdateMapEditor((Vector2){0,8});
+
+  // UPDATE BUTTONS 
+  UpdateNanoButton(&mapEditorPage);
+  UpdateNanoButton(&mapFullPage);
+
+  if(IsMouseButtonPressed(0)){
+    switch(hoverUI){
+      case SPR_UI_TOOLS:
+        toolClicked = (Tools)hoveredIndex;
+        break;
+      default:
+        break;
+    }
+  }
+
+  switch(hoverUI){
+    case SPR_UI_TOOLS: 
+      if(hoveredIndex >= 0 && hoveredIndex < TOOL_COUNT)
+        switch(hoveredIndex){
+          case TOOL_PEN:
+            sprintf(labelname, "Pen");
+            break;
+          case TOOL_SELECT:
+            sprintf(labelname, "Select - not working yet");
+            break;
+          case TOOL_PAN:
+            sprintf(labelname, "Pan");
+            break;
+          case TOOL_FILL:
+            sprintf(labelname, "Fill - not working yet");
+            break;
+          case TOOL_SHAPE:
+            sprintf(labelname, "Shapes - nah");
+            break;
+        }
+      break;
+    default:
+      sprintf(labelname, " ");
+      break;
+  }
 }
 
 void MapInput(void){
@@ -78,7 +131,7 @@ void MapInput(void){
 
   // TOOL INPUT 
   int32_t key = GetKeyPressed();
-  if(key >= '1' && key <= '5')
+  if(key >= '1' && key <= '5'){
     switch(key){
       case '1': toolClicked = TOOL_PEN; break;
       case '2': toolClicked = TOOL_SELECT; break;
@@ -86,6 +139,13 @@ void MapInput(void){
       case '4': toolClicked = TOOL_FILL; break;
       case '5': toolClicked = TOOL_SHAPE; break;
     }
+  }
+
+  // BUTTONS INPUT UPDATE 
+  if(mapEditorPage.clicked) mapEditor.showSelector = true;
+  if(mapFullPage.clicked) mapEditor.showSelector = false;
+  mapEditorPage.active = mapEditor.showSelector;
+  mapFullPage.active = !mapEditor.showSelector;
 }
 
 void MapDraw(void){
@@ -103,11 +163,12 @@ void MapDraw(void){
   DrawRectangleLines(0, SCREENHEIGHT*SCREENSCALE - TILESIZE*SCREENSCALE, (SCREENWIDTH+1)*SCREENSCALE, TILESIZE*SCREENSCALE+1, GetNanoColor(8));
   
   // map editor tabs/pages viewers
-  DrawIcons(15, (Vector2){0,0}, 6 + (2 * mapEditor.showSelector)); 
-  DrawIcons(16, (Vector2){8,0}, 6 + (2 * !mapEditor.showSelector));
+  DrawNanoButton(&mapEditorPage);
+  DrawNanoButton(&mapFullPage);
 
   // TEXT UI 
   DrawSpriteIndex((Vector2){36, 0});
+  DrawTextUI(labelname, (Vector2){1, SCREENHEIGHT-FONTHEIGHT-1});
 }
 
 // DRAW MAP EDITOR
@@ -155,7 +216,7 @@ static void DrawMapEditor(Vector2 position){
         DrawMapTiles((Vector2){screenX, screenY}, getMapSprite);
      
       // hovered tile
-      if(mousepos.x > screenX*SCREENSCALE && mousepos.x < screenX*SCREENSCALE + mapEditor.tileSize*SCREENSCALE && mousepos.y > screenY*SCREENSCALE && mousepos.y < screenY*SCREENSCALE + mapEditor.tileSize*SCREENSCALE)
+      if(mousepos.x > screenX*SCREENSCALE && mousepos.x < screenX*SCREENSCALE + mapEditor.tileSize*SCREENSCALE && mousepos.y > screenY*SCREENSCALE && mousepos.y < screenY*SCREENSCALE + mapEditor.tileSize*SCREENSCALE && toolClicked == TOOL_PEN)
       DrawRectangleLines(
         screenX * SCREENSCALE,
         screenY * SCREENSCALE,
@@ -183,23 +244,29 @@ static void UpdateMapEditor(Vector2 position){
   Vector2 mousepos = GetMousePosition();
 
   int32_t mouseTileX = (mousepos.x / SCREENSCALE - position.x + mapEditor.camera.x) / mapEditor.tileSize;
-  int32_t mouseTileY = (mousepos.y / SCREENSCALE - position.y + mapEditor.camera.y) / mapEditor.tileSize;
-  int32_t index = mouseTileY * MAPWIDTH + mouseTileX;
+  int32_t mouseTileY = (mousepos.y / SCREENSCALE - position.y + mapEditor.camera.y) / mapEditor.tileSize; 
 
-  //printf("index %d %d %d\n", index, mouseTileX, mouseTileY);
-  if(IsMouseButtonDown(MOUSE_LEFT_BUTTON)){ 
-    if(mouseTileX >= 0 && mouseTileX < MAPWIDTH && mouseTileY >= 0 && mouseTileX < MAPHEIGHT){
-      if(mousepos.y > 80*SCREENSCALE && mapEditor.showSelector) return; 
-      MapSet(index, spriteEditor.activeSpriteIndex);
+  if(IsMouseButtonDown(MOUSE_LEFT_BUTTON)){
+    switch(toolClicked){
+      case TOOL_PEN:{
+        if(mouseTileX >= 0 && mouseTileX < MAPWIDTH && mouseTileY >= 0 && mouseTileX < MAPHEIGHT){
+          if(mousepos.y > 80*SCREENSCALE && mapEditor.showSelector) return; 
+          MSet(mouseTileX, mouseTileY, spriteEditor.activeSpriteIndex);
+        }
+        break;
+      }
+      case TOOL_PAN:
+        mapEditor.camera.x -= GetMouseDelta().x * (mapEditor.tileSize / 16.0f) * 0.9f;
+        mapEditor.camera.y -= GetMouseDelta().y * (mapEditor.tileSize / 16.0f) * 0.9f;
+        break;
+      case TOOL_FILL:
+        // TODO: floodfill for maps
+        //FloodFill(mapData, mouseTileX, mouseTileY, mapData[mouseTileY * MAPWIDTH + mouseTileX], spriteEditor.activeSpriteIndex);
+        break;
+      default:
+        break;
     }
   }
-
-  //printf("x %d y %d index %d\n", mouseTileX, mouseTileY, index);
-}
-
-// CHECK THIS LATER
-static void MapSet(int32_t mapIndex, int32_t spriteIndex){
-  mapData[mapIndex] = spriteIndex;
 }
 
 // draw the sprite

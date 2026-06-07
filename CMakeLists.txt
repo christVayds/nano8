@@ -30,6 +30,7 @@ set(SOURCES
   src/maps.c 
   src/sfx.c
   src/cartridge.c
+  src/nanoUI.c
 )
 
 # Add executable using main.c and the generated lexer.c

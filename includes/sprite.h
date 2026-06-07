@@ -55,6 +55,6 @@ void DrawSpriteIndex(Vector2 position);
 void DrawTools(Vector2 position, int32_t distance, bool vertical);
 void UpdateTools(Vector2 position, int32_t distance, bool vertical);
 
-void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor);
+void FloodFill(int8_t *buffer, int32_t sx, int32_t sy, int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor, int32_t spriteSize);
 
 #endif

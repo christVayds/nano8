@@ -1,6 +1,6 @@
 #include "sprite.h"
 #include "game.h"
-#include "font.h"
+#include "nanoUI.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -34,9 +34,13 @@ static int32_t zoomValue = 0;
 static int32_t pensilSize = 0;
 static int32_t showWholeSprite = false;
 
-static SprUIClicked hoverUI = SPR_UI_NONE;    // what UI/element user are hovered in mouse 
-static int32_t hoveredIndex = -1;             // what type of UI are hovered 
-static char labelname[32];                    // to show the label of the UI
+SprUIClicked hoverUI = SPR_UI_NONE;    // what UI/element user are hovered in mouse 
+int32_t hoveredIndex = -1;             // what type of UI are hovered 
+char labelname[32];                    // to show the label of the UI
+
+// BUTTONS 
+static NanoButton spriteEditorPage;
+static NanoButton spriteViewerPage;
 
 int8_t *GetSprite(void){
   return sprites; 
@@ -70,6 +74,10 @@ void SpriteInit(void){
   pixelSelection.position = (Vector2){0,0};
   pixelSelection.size = (Vector2){0,0};
   toolClicked = TOOL_PEN;
+
+  // INITIALIZE BUTTONS 
+  InitNanoButtonIcon(&spriteEditorPage, (Rectangle){0, 0, TILESIZE, TILESIZE}, "Sprite Editor", 15, false);
+  InitNanoButtonIcon(&spriteViewerPage, (Rectangle){TILESIZE, 0, TILESIZE, TILESIZE}, "Sprite Viewer", 16, false);
 }
 
 void SpriteFree(void){
@@ -93,6 +101,10 @@ void SpriteUpdate(void){
   UpdateSwitch((Vector2){100, 30}, SPR_UI_ZOOMSIZE);          // zoom size update
   UpdateSpriteFlags((Vector2){88, 12});
   UpdateSpriteSheet((Vector2){0,88});
+
+  // UPDATE BUTTONS
+  UpdateNanoButton(&spriteEditorPage);
+  UpdateNanoButton(&spriteViewerPage);
 
   // click buttons
   if(IsMouseButtonPressed(0)){
@@ -181,7 +193,7 @@ void SpriteInput(void){
   TabInput(&showWholeSprite);
 
   int32_t key = GetKeyPressed();
-  if(key >= '1' && key <= '5')
+  if(key >= '1' && key <= '5'){
     switch(key){
       case '1': toolClicked = TOOL_PEN; break;
       case '2': toolClicked = TOOL_SELECT; break;
@@ -189,6 +201,13 @@ void SpriteInput(void){
       case '4': toolClicked = TOOL_FILL; break;
       case '5': toolClicked = TOOL_SHAPE; break;
     }
+  }
+
+  // BUTTONS INPUT UPDATE 
+  if(spriteEditorPage.clicked) showWholeSprite = false;
+  if(spriteViewerPage.clicked) showWholeSprite = true;
+  spriteEditorPage.active = !showWholeSprite;
+  spriteViewerPage.active = showWholeSprite;
 }
 
 // DRAW SPRITE EDITOR PAGE
@@ -214,8 +233,8 @@ void SpriteDraw(void){
   DrawRectangleLines(0, SCREENHEIGHT*SCREENSCALE - TILESIZE*SCREENSCALE, (SCREENWIDTH+1)*SCREENSCALE, TILESIZE*SCREENSCALE+1, GetNanoColor(8));
 
   // sprite editor tabs/pages viewers
-  DrawIcons(15, (Vector2){0,0}, 6 + (2 * !showWholeSprite));
-  DrawIcons(16, (Vector2){8,0}, 6 + (2 * showWholeSprite));
+  DrawNanoButton(&spriteEditorPage);
+  DrawNanoButton(&spriteViewerPage);
 
   // Text UI
   DrawSpriteIndex((Vector2){36, 0});
@@ -275,7 +294,7 @@ static void UpdateSpriteEditor(Vector2 position){
             case TOOL_PAN:
               break;
             case TOOL_FILL:{
-              FloodFill(pixelX, pixelY, sprites[index], colorIndex);
+              FloodFill(sprites, sx, sy, pixelX, pixelY, sprites[index], colorIndex, spriteSize);
               break;
             } 
             case TOOL_SHAPE:
@@ -588,12 +607,11 @@ void DrawSpriteSheetTabs(Vector2 position){
   }
 }
 
-void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor){
-  if(targetColor == newColor) return;
-  int32_t spriteSize = TILESIZE * spriteEditor.zoom;
+void FloodFill(int8_t *buffer, int32_t sx, int32_t sy, int32_t start_x, int32_t start_y, int32_t targetColor, int8_t newColor, int32_t spriteSize){
+  if(targetColor == newColor) return; 
 
-  int32_t sx = (spriteEditor.activeSpriteIndex % 16) * TILESIZE;
-  int32_t sy = (spriteEditor.activeSpriteIndex / 16) * TILESIZE;
+  //int32_t sx = (spriteEditor.activeSpriteIndex % 16) * TILESIZE;
+  //int32_t sy = (spriteEditor.activeSpriteIndex / 16) * TILESIZE;
 
   Vector2 stack[SPRITEWIDTH*SPRITEHEIGHT];
   int top = 0;
@@ -606,8 +624,8 @@ void FloodFill(int32_t start_x, int32_t start_y, int32_t targetColor, int8_t new
 
     if(p.x < 0 || p.x >= spriteSize || p.y < 0 || p.y >= spriteSize) continue;
  
-    if(sprites[index] != targetColor) continue;
-    sprites[index] = newColor;
+    if(buffer[index] != targetColor) continue;
+    buffer[index] = newColor;
 
     stack[top++] = (Vector2){p.x+1, p.y};
     stack[top++] = (Vector2){p.x-1, p.y};

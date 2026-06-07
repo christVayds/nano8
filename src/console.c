@@ -21,11 +21,17 @@ static void RunLua(void);
 static void InsertCharacter(char* line, int32_t pos, char c);
 static void BackSpace(char* line, int32_t pos);
 static void PushConsoleLog(const char *text);
+static void GetCommandArgs(Console *console);
 
 // CONSOLE LOG
 #define CONSOLE_LOG_MAX 1024
 static char console_log[CONSOLE_LOG_MAX][256];
 static int32_t consoleLogCount = 0;
+static int32_t consoleBack = 0;
+
+#define COMMAND_ARGS_MAX 5
+static char commandArgs[COMMAND_ARGS_MAX][256];
+static int32_t argsCount = 0;
 
 // NEW STATE LUA 
 static lua_State *L = NULL;
@@ -48,8 +54,8 @@ void UpdateConsole(Console *console){
 
   Vector2 curPosition = GetCursorPosition();
 
-  if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){
-    //printf("hahahaha\n"); 
+  // TODO: CHECK THIS SOON, USE CAMERA INSTEAD
+  if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){ 
     ScrollUpScreen(FONTHEIGHT * SCREENSCALE);
     SetCursorPosition((Vector2){curPosition.x, curPosition.y - FONTHEIGHT * SCREENSCALE});
   }
@@ -59,6 +65,9 @@ void UpdateConsole(Console *console){
     // push command to the console log
     PushConsoleLog(console->command);
 
+    // get command args 
+    GetCommandArgs(console);
+
     Vector2 position = GetCursorPosition();
 
     // EXIT NANO 8
@@ -67,33 +76,54 @@ void UpdateConsole(Console *console){
     } else if(strcmp(console->command, "run") == 0){
       // RUN LUA PROGRAM
       RunLua();
-    } else if(strcmp(console->command, "save") == 0){
-      PushConsoleLog(console->command);
+    } else if(strcmp(console->command, "cls") == 0 || strcmp(console->command, "clear") == 0){
+      ClearScreen(0);
+      SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
+    } else if(strcmp(commandArgs[0], "save") == 0){                 // SAVE CARTRIDGE
+      if(argsCount < 2){
+        ChangeTextCurrentColor(8);
+        PrintText("Invalid argument", &position);
+        position.y += FONTHEIGHT;
+        position.x = FONTWIDTH;
+        SetCursorPosition((Vector2){position.x, position.y});  
+      } else {
+        PushConsoleLog(console->command);
 
-      ChangeTextCurrentColor(8);
-      PrintText("saved", &position);
-      position.y += FONTHEIGHT;
-      position.x = FONTWIDTH;
-      SetCursorPosition((Vector2){position.x, position.y});
+        ChangeTextCurrentColor(6);
+        PrintText("saved", &position);
+        position.y += FONTHEIGHT;
+        position.x = FONTWIDTH;
+        SetCursorPosition((Vector2){position.x, position.y});
 
-      SaveCartridge("untitled.n8");
-    } else if(strcmp(console->command, "load") == 0){
-      PushConsoleLog(console->command);
+        SaveCartridge(commandArgs[1]);
+      }
+    } else if(strcmp(commandArgs[0], "load") == 0){                   // LOAD CARTRIDGE
+      if(argsCount < 2){
+        ChangeTextCurrentColor(8);
+        PrintText("Invalid argument", &position);
+        position.y += FONTHEIGHT;
+        position.x = FONTWIDTH;
+        SetCursorPosition((Vector2){position.x, position.y});  
+      } else {
+        PushConsoleLog(console->command);
 
-      ChangeTextCurrentColor(8);
-      PrintText("loaded", &position);
-      position.y += FONTHEIGHT;
-      position.x = FONTWIDTH;
-      SetCursorPosition((Vector2){position.x, position.y});
-
-      LoadCartridge("untitled.n8");
+        if(!LoadCartridge(commandArgs[1])){
+          ChangeTextCurrentColor(8);
+          PrintText("Cartridge not found", &position);
+          position.y += FONTHEIGHT;
+          position.x = FONTWIDTH;
+          SetCursorPosition((Vector2){position.x, position.y});
+        } else {
+          ChangeTextCurrentColor(8);
+          PrintText("loaded", &position);
+          position.y += FONTHEIGHT;
+          position.x = FONTWIDTH;
+          SetCursorPosition((Vector2){position.x, position.y}); 
+        }
+      }
     } else { // NANO 8 CONSOLE
       // LUA ERROR - CONSOLE
       if(luaL_dostring(L, console->command) != LUA_OK){
-        
-        // push error message to the console log
-        PushConsoleLog(lua_tostring(L, -1));
-
         ChangeTextCurrentColor(8);
         PrintText(lua_tostring(L, -1), &position);
         position.y += FONTHEIGHT;
@@ -101,10 +131,6 @@ void UpdateConsole(Console *console){
         SetCursorPosition((Vector2){position.x, position.y}); 
 
         lua_pop(L, 1);
-      } else {
-        position.y += FONTHEIGHT;
-        position.x = FONTWIDTH;
-        SetCursorPosition((Vector2){position.x, position.y}); 
       }
     }
  
@@ -117,6 +143,7 @@ void UpdateConsole(Console *console){
 void InputConsole(Console *console){
   if(GetCartIfRunning()) return;
   int key = GetCharPressed();
+  
   if(key >= 32 && console->cursor < 256){
     InsertCharacter(console->buffer, console->cursor, key);
     console->cursor++;
@@ -138,7 +165,8 @@ void InputConsole(Console *console){
     strcpy(console->command, console->buffer);
     memset(console->buffer, 0, sizeof(console->buffer));
     console->cursor = 0;
-    currentCursorPos = 0; 
+    currentCursorPos = 0;
+    consoleBack = consoleLogCount;
   }
 
   if(IsKeyPressed(KEY_LEFT) && console->cursor > 0){
@@ -147,12 +175,25 @@ void InputConsole(Console *console){
   if(IsKeyPressed(KEY_RIGHT) && console->cursor < currentCursorPos){
     console->cursor++;
   }
+
+  // TODO: fix this soon
+  if(IsKeyPressed(KEY_UP)){
+    console->cursor = 0;
+    currentCursorPos = 0;
+    if(consoleBack < 0) return;
+    char *getLatestBuffer = console_log[consoleBack--];
+    int32_t len = strlen(getLatestBuffer);
+    strcpy(console->buffer, getLatestBuffer);
+    console->cursor = len;
+    currentCursorPos = len;
+  }
 }
 
 void DrawConsole(Console *console){
   if(GetCartIfRunning()) return;
 
   Vector2 position = GetCursorPosition(); 
+  position.x = FONTWIDTH;                   // reset cursor position
 
   if(!console->newCommand){
     ChangeTextCurrentColor(8);
@@ -160,12 +201,8 @@ void DrawConsole(Console *console){
     position.x += FONTWIDTH;
   }
   ChangeTextCurrentColor(6); 
-  PrintText(console->buffer, &position);
-
-  // draw cursor
-  // TODO: FIX THIS SOON
-  position.x = FONTWIDTH*3 + (console->cursor * FONTWIDTH);
-  GetFont(95, position, true, false);
+  PrintText(console->buffer, &position); 
+  GetFont(95, position, true, false);       // draw cursor 
 }
 
 // RUNNING LUA CODE FROM EDITOR
@@ -268,4 +305,27 @@ bool CallLuaFunction(const char* funcname){
   }
 
   return funcExist;
+}
+
+static void GetCommandArgs(Console *console){
+  argsCount = 0; 
+  int32_t index = 0;
+  char text[32];
+  int32_t textCount = 0;
+  
+  while(true){
+    if(console->command[index] == '\0'){
+      strcpy(commandArgs[argsCount++], text);
+      return;
+    }
+    if(console->command[index] == ' '){
+      strcpy(commandArgs[argsCount++], text); 
+      index++;
+      textCount = 0;
+      continue;
+    }
+
+    text[textCount++] = console->command[index];
+    index++;
+  }
 }

@@ -10,6 +10,7 @@
 
 static void DrawSceneUI(Scene *scene);
 static void SwitchScene(Scene *scene, SceneType sceneType, int32_t isDown);
+static void SwitchSceneMouse(Scene *scene);
 
 // ------------------
 //  UPDATE SCENE 
@@ -68,6 +69,8 @@ void InputScene(Scene *scene){
     SwitchScene(scene, SCENE_MAP_EDITOR, IsKeyPressed(KEY_F3));
     SwitchScene(scene, SCENE_SFX_EDITOR, IsKeyPressed(KEY_F4));
     SwitchScene(scene, SCENE_MUSIC_EDITOR, IsKeyPressed(KEY_F5));
+
+    SwitchSceneMouse(scene);
   }
 
   // PER SCENE INPUT 
@@ -128,17 +131,28 @@ void DrawScene(Scene *scene){
 static void DrawSceneUI(Scene *scene){
   Vector2 position = {88, 0};
   int32_t iconIndex = 0;
-  for(int32_t i=1;i<=5;i++){ 
-    if((int32_t)scene->sceneType == i)
-      DrawRectangle(position.x*SCREENSCALE, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(8));
-    //DrawRectangleLines(position.x, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, WHITE);
-    DrawIcons(iconIndex++, (Vector2){position.x, position.y}, 6);
-    position.x += TILESIZE;
+  for(int32_t i=0;i<5;i++){ 
+    if((int32_t)scene->sceneType == i+1)
+      DrawRectangle((position.x+i*TILESIZE)*SCREENSCALE, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(8)); 
+    DrawIcons(iconIndex++, (Vector2){position.x+i*TILESIZE, position.y}, 6);
   }
 }
 
 static void SwitchScene(Scene *scene, SceneType sceneType, int32_t isDown){
   if(isDown){
     scene->sceneType = sceneType;
+  }
+}
+
+static void SwitchSceneMouse(Scene *scene){
+  if(!IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) return;
+  Vector2 mouseposition = GetMousePosition();
+  Vector2 position = {88, 0}; 
+  for(int32_t i=0;i<5;i++){
+    bool mouseCollide = CheckCollisionPointRec(mouseposition, (Rectangle){(position.x+i*TILESIZE)*SCREENSCALE, position.y, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE});
+    if(mouseCollide){
+      scene->sceneType = i+1;
+      return;
+    }
   }
 }

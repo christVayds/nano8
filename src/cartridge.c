@@ -9,7 +9,7 @@
 #include <raylib.h>
 
 extern int8_t sprites[SPRITEWIDTH*SPRITEHEIGHT];
-extern int32_t mapData[MAPWIDTH*MAPHEIGHT];
+extern int8_t mapData[MAPWIDTH*MAPHEIGHT];
 
 static int32_t HexToInt(char c);
 
@@ -50,6 +50,12 @@ void SaveCartridge(const char* filename){
     fprintf(fp, "\n");
   }
 
+  // SFX 
+  fprintf(fp, "__SFX__\n\n");
+
+  // MUSIC
+  fprintf(fp, "__MUSIC__\n\n");
+
   // CODE
   fprintf(fp, "__LUA__\n");
 
@@ -85,6 +91,14 @@ bool LoadCartridge(const char* filename){
     }
     if(strncmp(line, "__MAPS__", 8) == 0){
       cartSection = CART_MAP;
+      continue;
+    }
+    if(strncmp(line, "__SFX__", 7) == 0){
+      cartSection = CART_SFX;
+      continue;
+    }
+    if(strncmp(line, "__MUSIC__", 9) == 0){
+      cartSection = CART_MUSIC;
       continue;
     }
     if(strncmp(line, "__LUA__", 7) == 0){
@@ -141,6 +155,10 @@ bool LoadCartridge(const char* filename){
         //printf("line %s\n", line);
         LoadCode(line, strlen(line));
       }
+        break;
+      case CART_SFX:
+        break;
+      case CART_MUSIC:
         break;
       default:
         break;

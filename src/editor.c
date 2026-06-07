@@ -40,7 +40,7 @@ static bool arrowKeyHeldDown = false;
 // define static functions
 static void DrawSomeText(char *texts, Vector2 position);
 static void DrawTextEditor(Vector2 *position);
-static void DrawFont(const int32_t fontIndex, Vector2 position);
+//static void DrawFont(const int32_t fontIndex, Vector2 position);
 static void InsertCharacter(int32_t pos, char c);
 static void BackSpace(int32_t pos);
 static void CountToken(void);
@@ -52,13 +52,13 @@ static int isSymbol(const char c);
 static const char* kw[] = {
   "local", "function", "end", "if", "then", "else", "elseif", "for", "while", "do", 
   "return", "break", "false", "true", "yanji", "nano8", "or", "and", "not",
-  "K_A", "K_S", "K_Z", "K_X", "K_L", "K_R", "K_U", "K_D"
+  "K_A", "K_S", "K_Z", "K_X", "K_L", "K_R", "K_U", "K_D", "table"
 };
 
 static const char* func[] = {
   "print", "_init", "_update", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr",
   "pset", "pget", "line", "btn", "btnp", "cls", "map", "mset", "mget", "fget", "fset", "camera", "cursor", "pal", "palt", 
-  "flr", "abs", "ciel", "sqrt", "sin", "cos", "rand", "srand", "min", "max"
+  "flr", "abs", "ciel", "sqrt", "sin", "cos", "rand", "srand", "min", "max", "insert"
 };
 
 static const char symbols[] = {
@@ -155,14 +155,6 @@ void InputEditor(void){
   // ---------------- 
   //  SECTIONS CONTROL
   // ---------------- 
-
-  // TODO:
-  // CONTROL SHIFT T to remove TAB/SECTION
-  //if(IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_T)){
-  //  if(sections.sectionsCount > 1) sections.sectionsCount--;
-  //  sections.sectionCurrent = sections.sectionsCount;
-  //} 
-
   // CONTROL + T to create new TAB/SECTION 
   else if(IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_T) && sections.sectionsCount+1 < MAXSECTIONS){
     NewSection();
@@ -474,7 +466,7 @@ void DrawEditor(void){
   int32_t cposx = 1 + -(codeEditor->scrollX * FONTWIDTH) + codeEditor->cursorPosition.x * FONTWIDTH;
   int32_t cposy = (TILESIZE+1+ -(codeEditor->scrollY * FONTHEIGHT)) + codeEditor->cursorPosition.y * FONTHEIGHT;
   ChangeTextCurrentColor(10);
-  DrawFont(95, (Vector2){cposx, cposy});
+  GetFont(95, (Vector2){cposx, cposy}, false, false);
   ChangeTextCurrentColor(6);
 
   // draw code 
@@ -495,7 +487,7 @@ void DrawEditor(void){
   for(int32_t i=0;i<=sections.sectionsCount;i++){
     if(sections.sectionCurrent == i)
       DrawRectangle(tabPosition, 0, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(8)); 
-    DrawFont((countAscii++) - 32, (Vector2){countPosition, 1});
+    GetFont((countAscii++) - 32, (Vector2){countPosition, 1}, false, false);
     countPosition += TILESIZE + 1;
     tabPosition += TILESIZE * SCREENSCALE + SCREENSCALE;
   }
@@ -539,7 +531,7 @@ static void DrawSomeText(char *texts, Vector2 position){
       int32_t fontIndex = c-32;
 
       if(fontIndex >= 0){
-        DrawFont(fontIndex, position);
+        GetFont(fontIndex, position, false, false);
         position.x += FONTWIDTH;
       }
     } else {
@@ -574,7 +566,7 @@ static void DrawTextEditor(Vector2 *position){
       ChangeTextCurrentColor(COL_COMMENT);
       for(int32_t i=start;i<index;i++){
         int32_t fIndex = codeEditor->code[i]-32;
-        DrawFont(fIndex, *position);
+        GetFont(fIndex, *position, false, false);
         position->x += FONTWIDTH;
       }
       ChangeTextCurrentColor(COL_DEFAULT);
@@ -592,7 +584,7 @@ static void DrawTextEditor(Vector2 *position){
       ChangeTextCurrentColor(COL_STRING);
       for(int32_t i=start;i<index;i++){
         int32_t fIndex = codeEditor->code[i]-32;
-        DrawFont(fIndex, *position);
+        GetFont(fIndex, *position, false, false);
         position->x += FONTWIDTH;
       }
       ChangeTextCurrentColor(COL_DEFAULT);
@@ -607,7 +599,7 @@ static void DrawTextEditor(Vector2 *position){
       ChangeTextCurrentColor(COL_NUMBER);
       for(int32_t i=start;i<index;i++){
         int32_t fIndex = codeEditor->code[i]-32;
-        DrawFont(fIndex, *position);
+        GetFont(fIndex, *position, false, false);
         position->x += FONTWIDTH;
       }
       ChangeTextCurrentColor(COL_DEFAULT); 
@@ -616,7 +608,7 @@ static void DrawTextEditor(Vector2 *position){
 
     if(isSymbol(c)){
       ChangeTextCurrentColor(COL_SYMBOL);
-      DrawFont(fontIndex, *position);
+      GetFont(fontIndex, *position, false, false);
       position->x += FONTWIDTH;
       ChangeTextCurrentColor(COL_DEFAULT);
       index++;
@@ -642,7 +634,7 @@ static void DrawTextEditor(Vector2 *position){
       
       for(int32_t i=start;i<index;i++){
         int32_t fIndex = codeEditor->code[i]-32;
-        DrawFont(fIndex, *position);
+        GetFont(fIndex, *position, false, false); 
         position->x += FONTWIDTH;
       }
       ChangeTextCurrentColor(COL_DEFAULT);
@@ -651,28 +643,11 @@ static void DrawTextEditor(Vector2 *position){
 
     // SINGLE CHAR
     if(fontIndex >= 0){
-      DrawFont(fontIndex, *position);
+      GetFont(fontIndex, *position, false, false);
       position->x += FONTWIDTH;
     }
 
     index++;
-  }
-}
-
-// draw the font
-static void DrawFont(const int32_t fontIndex, Vector2 position){
-  const int32_t posx = position.x;
-  for(int32_t y=0;y<FONTHEIGHT;y++){
-    for(int32_t x=0;x<FONTWIDTH;x++){
-      int32_t index = y * FONTWIDTH + x;
-      uint32_t text = GetFontText(fontIndex)[index];
-      
-      if(text > 0)
-        DrawRectangle(position.x * SCREENSCALE, position.y * SCREENSCALE, SCREENSCALE, SCREENSCALE, GetNanoColor(GetTextCurrentColor()));
-      position.x += 1;
-    } 
-    position.x = posx;
-    position.y += 1;
   }
 }
 

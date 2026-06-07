@@ -10,6 +10,8 @@ typedef enum{
   CART_PALLETE,
   CART_SPRITES,
   CART_MAP,
+  CART_SFX,
+  CART_MUSIC,
   CART_LUA
 } CartSection;
 
