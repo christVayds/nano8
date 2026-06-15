@@ -1009,7 +1009,6 @@ void DrawScreenLine(int32_t posx1, int32_t posy1, int32_t posx2, int32_t posy2, 
   int err = dx - dy;
 
   while(1){
-    //Screen[posy1 * SCREENWIDTH + posx1] = colorIndex;
     pset(posx1, posy1, colorIndex);
     if(posx1 == posx2 && posy1 == posy2) break;
 
@@ -1025,9 +1024,12 @@ void DrawScreenLine(int32_t posx1, int32_t posy1, int32_t posx2, int32_t posy2, 
   } 
 }
 
-void DrawRectFill(int32_t x, int32_t y, int32_t width, int32_t height, int32_t colorIndex){
-  for(int32_t i=0;i<height;i++){
-    DrawScreenLine(x, y+i,x+width,y+i, colorIndex);
+void DrawRectFill(int32_t x, int32_t y, int32_t width, int32_t height, int32_t colorIndex){ 
+  if(x > width){ int32_t t=x; x=width; width=t; }
+  if(y > height){ int32_t t=y; y=height; height=t; }
+
+  for(int32_t i = y; i <= height; i++){
+    DrawScreenLine(x, i, width, i, colorIndex);
   }
 }
 
@@ -1231,3 +1233,15 @@ void DrawIcons(uint32_t iconIndex, Vector2 position, int32_t colorIndex){
     }
   }
 }
+
+void ClearConsole(void){
+  // TODO:
+  // [] clear code editor 
+  // [] clear sprite editor
+  // [] flags
+  // [] clear map editor
+  memset(mapData, 0, sizeof(mapData));
+  // [] clear sfx editor 
+  // [] clear music editor
+}
+

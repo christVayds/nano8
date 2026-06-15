@@ -1,3 +1,7 @@
+/*
+*   A FAKE 8-BIT GAME ENGINE SIMILAR TO PICO-8
+*/ 
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>

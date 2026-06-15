@@ -70,5 +70,6 @@ void FreeSections(void);
 void NewSection(void);
 int32_t GetEditorSectionCount(void);
 void RemoveSection(void);             // NOTE: Not implemented yet
+void ResetSection(void);
 
 #endif

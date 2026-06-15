@@ -16,6 +16,8 @@
 #include "cartridge.h"
 
 static int currentCursorPos = 0;
+static int32_t inputLineY = -1;
+static int32_t inputLineMaxY = 0;
 
 static void RunLua(void);
 static void InsertCharacter(char* line, int32_t pos, char c);
@@ -42,6 +44,25 @@ Console InitConsole(void){
   newConsole.newCommand = false;
 
   L = InitLuaState(); 
+
+  // intro shown on console start
+  Vector2 pos = GetCursorPosition();
+  ChangeTextCurrentColor(6);
+  PrintText("Nano-", &pos);
+  ChangeTextCurrentColor(8);
+  PrintText("8", &pos);
+  ChangeTextCurrentColor(6);
+  PrintText(" v0.0.1\n", &pos);
+  pos.x = FONTWIDTH;
+  PrintText("by ", &pos);
+  ChangeTextCurrentColor(14);
+  PrintText("Yanji Games\n", &pos);
+  ChangeTextCurrentColor(6);
+  pos.y += FONTHEIGHT;
+  pos.x = FONTWIDTH;
+  PrintText("Type 'help' for help.\n", &pos);
+  pos.y += FONTHEIGHT;
+  SetCursorPosition(pos);
   return newConsole;
 }
 
@@ -170,29 +191,64 @@ void InputConsole(Console *console){
   }
 
   if(IsKeyPressed(KEY_LEFT) && console->cursor > 0){
+    // move cursor left one position if not at start
     console->cursor--;
   }
-  if(IsKeyPressed(KEY_RIGHT) && console->cursor < currentCursorPos){
-    console->cursor++;
+  if(IsKeyPressed(KEY_RIGHT)){
+    // move cursor right but not past the current buffer length
+    int32_t bufLen = (int32_t)strlen(console->buffer);
+    if(console->cursor < bufLen) console->cursor++;
   }
 
-  // TODO: fix this soon
+  // History navigation: Up = previous, Down = next (like pico-8)
   if(IsKeyPressed(KEY_UP)){
-    console->cursor = 0;
-    currentCursorPos = 0;
-    if(consoleBack < 0) return;
-    char *getLatestBuffer = console_log[consoleBack--];
-    int32_t len = strlen(getLatestBuffer);
+    if(consoleLogCount <= 0) return;
+    // if consoleBack is out-of-range (e.g., equals consoleLogCount), move to last entry
+    if(consoleBack > consoleLogCount - 1) consoleBack = consoleLogCount - 1;
+    else if(consoleBack > 0) consoleBack--;
+
+    // copy history entry into current buffer
+    char *getLatestBuffer = console_log[consoleBack];
+    int32_t len = (int32_t)strlen(getLatestBuffer);
     strcpy(console->buffer, getLatestBuffer);
     console->cursor = len;
     currentCursorPos = len;
+  }
+
+  if(IsKeyPressed(KEY_DOWN)){
+    if(consoleLogCount <= 0) return;
+    // move forward in history; if we go past the last entry, clear buffer
+    if(consoleBack < 0) consoleBack = 0;
+    else if(consoleBack < consoleLogCount - 1){
+      consoleBack++;
+      char *getNext = console_log[consoleBack];
+      int32_t len = (int32_t)strlen(getNext);
+      strcpy(console->buffer, getNext);
+      console->cursor = len;
+      currentCursorPos = len;
+    } else {
+      // past the newest entry -> clear input
+      consoleBack = consoleLogCount;
+      memset(console->buffer, 0, sizeof(console->buffer));
+      console->cursor = 0;
+      currentCursorPos = 0;
+    }
   }
 }
 
 void DrawConsole(Console *console){
   if(GetCartIfRunning()) return;
 
-  Vector2 position = GetCursorPosition(); 
+  Vector2 position = GetCursorPosition();
+  int32_t lineY = (int32_t)position.y;
+
+  if(lineY != inputLineY){
+    inputLineY = lineY;
+    inputLineMaxY = lineY + FONTHEIGHT;
+  }
+
+  DrawRectFill(0, lineY, SCREENWIDTH - 1, inputLineMaxY - 1, 0);
+
   position.x = FONTWIDTH;                   // reset cursor position
 
   if(!console->newCommand){
@@ -200,9 +256,20 @@ void DrawConsole(Console *console){
     PrintText(">", &position);
     position.x += FONTWIDTH;
   }
-  ChangeTextCurrentColor(6); 
-  PrintText(console->buffer, &position); 
-  GetFont(95, position, true, false);       // draw cursor 
+  ChangeTextCurrentColor(6);
+  // remember where the buffer starts so we can compute the cursor draw position
+  int32_t bufferStartX = position.x;
+  int32_t bufferStartY = position.y;
+  PrintText(console->buffer, &position);
+
+  // draw cursor at `console->cursor` column instead of relying on the printed position
+  int32_t bufLen = (int32_t)strlen(console->buffer);
+  if(console->cursor < 0) console->cursor = 0;
+  if(console->cursor > bufLen) console->cursor = bufLen;
+  Vector2 cursorPos = { (float)(bufferStartX + console->cursor * FONTWIDTH), (float)bufferStartY };
+  GetFont(95, cursorPos, true, false);       // draw cursor at computed column
+
+  inputLineMaxY = (int32_t)position.y + FONTHEIGHT;
 }
 
 // RUNNING LUA CODE FROM EDITOR

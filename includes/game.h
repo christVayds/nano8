@@ -71,4 +71,7 @@ void ScrollUpScreen(int32_t amount);
 
 void DrawIcons(uint32_t iconIndex, Vector2 position, int32_t colorIndex);
 
+// reset console
+void ClearConsole(void);
+
 #endif

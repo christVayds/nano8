@@ -40,7 +40,6 @@ static bool arrowKeyHeldDown = false;
 // define static functions
 static void DrawSomeText(char *texts, Vector2 position);
 static void DrawTextEditor(Vector2 *position);
-//static void DrawFont(const int32_t fontIndex, Vector2 position);
 static void InsertCharacter(int32_t pos, char c);
 static void BackSpace(int32_t pos);
 static void CountToken(void);
@@ -445,11 +444,21 @@ void InputEditor(void){
     codeEditor->cursorColumn++;
   }
 
-  if(codeEditor->cursorLine >= codeEditor->scrollY + VISIBLELINES) codeEditor->scrollY = codeEditor->cursorLine - VISIBLELINES + 1;
-  if(codeEditor->cursorLine < codeEditor->scrollY) codeEditor->scrollY = codeEditor->cursorLine;
+  // keep a small margin so the cursor isn't flush against the top/left edges
+  const int32_t marginY = 5;
+  const int32_t marginX = 5;
 
-  if(codeEditor->cursorColumn >= codeEditor->scrollX + VISIBLECOLUMNS) codeEditor->scrollX = codeEditor->cursorColumn - VISIBLECOLUMNS + 1;
-  if(codeEditor->cursorColumn < codeEditor->scrollX) codeEditor->scrollX = codeEditor->cursorColumn; 
+  if(codeEditor->cursorLine >= codeEditor->scrollY + VISIBLELINES - marginY)
+    codeEditor->scrollY = codeEditor->cursorLine - (VISIBLELINES - marginY) + 1;
+  if(codeEditor->cursorLine < codeEditor->scrollY + marginY)
+    codeEditor->scrollY = codeEditor->cursorLine - marginY;
+  if(codeEditor->scrollY < 0) codeEditor->scrollY = 0;
+
+  if(codeEditor->cursorColumn >= codeEditor->scrollX + VISIBLECOLUMNS - marginX)
+    codeEditor->scrollX = codeEditor->cursorColumn - (VISIBLECOLUMNS - marginX) + 1;
+  if(codeEditor->cursorColumn < codeEditor->scrollX + marginX)
+    codeEditor->scrollX = codeEditor->cursorColumn - marginX;
+  if(codeEditor->scrollX < 0) codeEditor->scrollX = 0;
  
 }
 
@@ -856,4 +865,8 @@ static void DrawSelection(void){
       x += FONTWIDTH;
     }
   }
+}
+
+void ResetSection(void){
+
 }
