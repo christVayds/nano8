@@ -7,6 +7,7 @@
 #include <math.h>
 #include "game.h"
 #include "font.h"
+#include "sfx.h"
 
 #define MAX_LOG 1024
 
@@ -48,6 +49,7 @@ lua_State *InitLuaState(){
   lua_register(L, "srand", l_srand);
   lua_register(L, "min", l_min);
   lua_register(L, "max", l_max);
+  lua_register(L, "sfx", l_sfx);
 
   // GLOBAL VARIABLES
 
@@ -391,4 +393,11 @@ int l_max(lua_State *L){
   float y = luaL_checknumber(L, 2);
   lua_pushnumber(L, (x > y ? x : y));
   return 1;
+}
+
+int l_sfx(lua_State *L){
+  int x = luaL_optinteger(L, 1, -1);
+  int channelIndex = luaL_optinteger(L, 2, 0);
+  PlaySfx(x, channelIndex);
+  return 0;
 }

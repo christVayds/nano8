@@ -55,9 +55,10 @@ static const char* kw[] = {
 };
 
 static const char* func[] = {
-  "print", "_init", "_update", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr",
+  "print", "_init", "_update", "_main", "_draw", "main", "rectfill", "rect", "circ", "circfill", "spr",
   "pset", "pget", "line", "btn", "btnp", "cls", "map", "mset", "mget", "fget", "fset", "camera", "cursor", "pal", "palt", 
-  "flr", "abs", "ciel", "sqrt", "sin", "cos", "rand", "srand", "min", "max", "insert"
+  "flr", "abs", "ciel", "sqrt", "sin", "cos", "rand", "srand", "min", "max", "insert",
+  "sfx", "music"
 };
 
 static const char symbols[] = {

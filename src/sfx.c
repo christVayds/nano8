@@ -22,8 +22,6 @@ static NanoButton waveformButtons[8];
 // SFX
 static SFX sfxs[MAX_SFX];
 static int32_t currentSFX = 0;
-static int32_t rampSamples = 0;
-static int32_t rampDownSamples = 0;
 static float lastValue = 0.0f;
 
 // Fade-in/out length in samples.
@@ -32,9 +30,10 @@ static float lastValue = 0.0f;
 #define RAMP_LEN 512
 
 // SFX PLAYER 
-static SFXPlayer sfxPlayer;
-static Synth synth = {0};
 static AudioStream stream;
+
+static SFXPlayer channels[MAXCHANNELS];
+static uint8_t currentChannel = 0;
 
 static Waveform selectedWaveform = WAVE_TRIANGLE;
 
@@ -79,10 +78,25 @@ void SfxInit(void){
   ResetSFX();
 
   
-  // INITIALIZE SFX PLAYER 
-  sfxPlayer.playing = false;
-  sfxPlayer.currentStep = 0;
-  sfxPlayer.timer = 0;
+  // INITIALIZE SFX PLAYER (initialize the channels[4 channels]) 
+  for(int32_t i=0;i<MAXCHANNELS;i++){
+    channels[i].playing = false;
+    channels[i].currentStep = 0;
+    channels[i].sfxIndex = 0;
+    channels[i].timer = 0;
+    channels[i].rampDownSamples = 0;
+    channels[i].rampSamples = 0;
+    
+    //synth 
+    channels[i].synth.phase = 0;
+    channels[i].synth.freq = 0;
+    channels[i].synth.volume = 0;
+    channels[i].synth.targetVolume = 0;
+    channels[i].synth.waveform = 0;
+    channels[i].synth.effect = 0; 
+  }
+
+  // AUDIO STREAM
   stream = LoadAudioStream(44100, 32, 1);
   PlayAudioStream(stream);
   SetAudioStreamCallback(stream, AudioCallBack);
@@ -171,18 +185,21 @@ void SfxInput(void){
     advancePage = !advancePage;
   }
 
-  if(IsKeyPressed(KEY_SPACE)){
-    sfxPlayer.playing = true;
-    sfxPlayer.currentStep = 0;
-    sfxPlayer.timer = 0.0f;
-    rampDownSamples = 0;
-    rampSamples = 0;
+  if(IsKeyPressed(KEY_SPACE)){ 
+    // play the channel index 0 for test play
+    currentChannel = 0;
+    channels[currentChannel].sfxIndex = currentSFX;
+    channels[currentChannel].playing = true;
+    channels[currentChannel].currentStep = 0;
+    channels[currentChannel].timer = 0.0f;
+    channels[currentChannel].rampDownSamples = 0;
+    channels[currentChannel].rampSamples = 0;
 
-    SFXNote note = sfxs[currentSFX].notes[sfxPlayer.currentStep];
-    synth.freq = NoteToFreq(note.pitch);
-    synth.targetVolume = note.volume / 7.0f;
-    synth.phase = 0;
-    synth.waveform = note.waveform;
+    SFXNote note = sfxs[channels[currentChannel].sfxIndex].notes[channels[currentChannel].currentStep];
+    channels[currentChannel].synth.freq = NoteToFreq(note.pitch);
+    channels[currentChannel].synth.targetVolume = note.volume / 7.0f;
+    channels[currentChannel].synth.phase = 0;
+    channels[currentChannel].synth.waveform = note.waveform;
   } 
 
   // update input for waveform buttons 
@@ -365,7 +382,7 @@ static void DrawNotes(void){
     int32_t px = (position.x+y*(NOTEBOXSIZE*2));
     int32_t py = (position.y+row);
     color = note[y].waveform+8;
-    if(sfxPlayer.playing && sfxPlayer.currentStep == y) color = 0;
+    if(channels[currentChannel].playing && channels[currentChannel].currentStep == y) color = 0;
 
     if(prevX != -1){
       DrawLine(
@@ -445,54 +462,53 @@ static void DrawVolume(void){
 
 static void AudioCallBack(void *bufferData, uint32_t frames){
   float *samples = (float*)bufferData;
-  for(uint32_t i=0;i<frames;i++){ 
-    if(sfxPlayer.playing){
-      sfxPlayer.timer++;
+  for(uint32_t i=0;i<frames;i++){
+    float mixed = 0.0f;
+    for(int32_t chl=0;chl<MAXCHANNELS;chl++){
+      if(channels[chl].playing){
+        channels[chl].timer++;
 
-      if(sfxPlayer.timer >= sfxs[currentSFX].speed * (44100.0f / 128.0f)){
-        sfxPlayer.timer = 0;
+        if(channels[chl].timer >= sfxs[channels[chl].sfxIndex].speed * (44100.0f / 128.0f)){
+          channels[chl].timer = 0;
 
-        sfxPlayer.currentStep++;
-        if(sfxPlayer.currentStep >= MAX_NOTES){
-          sfxPlayer.playing = false;
-          rampDownSamples = 0;
-        } else {
-          SFXNote note = sfxs[currentSFX].notes[sfxPlayer.currentStep];
-          synth.freq = NoteToFreq(note.pitch);
-          synth.targetVolume = note.volume / 7.0f;
-          synth.waveform = note.waveform;
+          channels[chl].currentStep++;
+          if(channels[chl].currentStep >= MAX_NOTES){
+            channels[chl].playing = false;
+            channels[chl].rampDownSamples = 0;
+          } else {
+            SFXNote note = sfxs[channels[chl].sfxIndex].notes[channels[chl].currentStep];
+            channels[chl].synth.freq = NoteToFreq(note.pitch);
+            channels[chl].synth.targetVolume = note.volume / 7.0f;
+            channels[chl].synth.waveform = note.waveform;
+          }
+        }
+
+        if(channels[chl].playing){
+          channels[chl].synth.volume = channels[chl].synth.targetVolume;
+          float value = GetWave(channels[chl].synth.phase, channels[chl].synth.waveform) * channels[chl].synth.volume;
+          channels[chl].synth.phase += 2.0f * PI * channels[chl].synth.freq / 44100.0f;
+          if(channels[chl].synth.phase > 2.0f * PI) channels[chl].synth.phase -= 2.0f * PI;
+
+          if(channels[chl].rampSamples < RAMP_LEN){
+            value *= (float)channels[chl].rampSamples / RAMP_LEN;
+            channels[chl].rampSamples++;
+          }
+
+          mixed += value;
+        } else if(channels[chl].rampDownSamples < RAMP_LEN){
+          float t = (float)channels[chl].rampDownSamples / RAMP_LEN;
+        
+          // Quadratic fade-out.
+          // Smoother than a linear fade and reduces audible clicks
+          // when the waveform stops at a non-zero amplitude.
+          mixed += lastValue * (1.0f - t) * (1.0f - t);
+          channels[chl].rampDownSamples++;
         }
       }
 
-      if(sfxPlayer.playing){
-        synth.volume = synth.targetVolume;
-        float value = GetWave(synth.phase, synth.waveform) * synth.volume;
-        synth.phase += 2.0f * PI * synth.freq / 44100.0f;
-        if(synth.phase > 2.0f * PI) synth.phase -= 2.0f * PI;
-
-        if(rampSamples < RAMP_LEN){
-          value *= (float)rampSamples / RAMP_LEN;
-          rampSamples++;
-        }
-
-        lastValue = value;
-        samples[i] = value;
-        continue;
-      }
-    }
-
-    if(rampDownSamples < RAMP_LEN){
-      float t = (float)rampDownSamples / RAMP_LEN;
-      
-      // Quadratic fade-out.
-      // Smoother than a linear fade and reduces audible clicks
-      // when the waveform stops at a non-zero amplitude.
-      samples[i] = lastValue * (1.0f - t) * (1.0f - t);
-      rampDownSamples++;
-    } else {
-      samples[i] = 0.0f;
-    }
-    lastValue = samples[i];
+      samples[i] = mixed * 0.25f;
+      lastValue = samples[i];
+    } 
   }
 }
 
@@ -525,4 +541,28 @@ static float GetWave(float phase, int32_t waveType){
       break;
   }
   return 0;
+}
+
+// play sfx base on the sfxIndex 
+void PlaySfx(const int32_t sfxIndex, const int32_t channelIndex){
+  if(channelIndex < 0) return;
+  currentChannel = channelIndex;
+
+  if(sfxIndex < 0){ 
+    channels[currentChannel].playing = false;
+    return;
+  }
+
+  channels[currentChannel].sfxIndex = sfxIndex; 
+  channels[currentChannel].playing = true;
+  channels[currentChannel].currentStep = 0;
+  channels[currentChannel].timer = 0.0f;
+  channels[currentChannel].rampDownSamples = 0;
+  channels[currentChannel].rampSamples = 0;
+
+  SFXNote note = sfxs[channels[currentChannel].sfxIndex].notes[channels[currentChannel].currentStep];
+  channels[currentChannel].synth.freq = NoteToFreq(note.pitch);
+  channels[currentChannel].synth.targetVolume = note.volume / 7.0f;
+  channels[currentChannel].synth.phase = 0;
+  channels[currentChannel].synth.waveform = note.waveform;
 }

@@ -51,12 +51,6 @@ typedef struct{
 } SFX;
 
 typedef struct{
-  bool playing;
-  int32_t currentStep;
-  int32_t timer;
-} SFXPlayer;
-
-typedef struct{
   float phase;
   float freq;
   float volume;
@@ -65,11 +59,23 @@ typedef struct{
   int32_t effect;
 } Synth;
 
+typedef struct{
+  bool playing;
+  int32_t currentStep;
+  int32_t sfxIndex;
+  int32_t timer;
+  
+  int32_t rampDownSamples;
+  int32_t rampSamples;
+  Synth synth;
+} SFXPlayer;
+
 void SfxInit(void);
 void ResetSFX(void);
 void SfxUpdate(void);
 void SfxInput(void);
 void SfxDraw(void);
+void PlaySfx(const int32_t sfxIndex, const int32_t channelIndex);
 
 float NoteToFreq(int32_t picth);
 #endif

@@ -59,6 +59,8 @@ int l_srand(lua_State *L);
 int l_min(lua_State *L);
 int l_max(lua_State *L);
 
+int l_sfx(lua_State *L);
+
 void UpdateButton(Button btn, int isDown);
 void PoolInput(void);
 

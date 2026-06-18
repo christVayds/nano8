@@ -17,7 +17,7 @@
 
 #define SYMBOLSCOUNT 29
 #define KEYWORDCOUNT 28
-#define FUNCCOUNT 36
+#define FUNCCOUNT 39
 
 typedef enum{
   COL_DEFAULT = 6,

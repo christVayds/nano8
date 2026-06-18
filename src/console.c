@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -19,11 +20,26 @@ static int currentCursorPos = 0;
 static int32_t inputLineY = -1;
 static int32_t inputLineMaxY = 0;
 
+// key repeat state for long-press behavior
+static int repeatKey = 0;
+static int repeatActive = 0;
+static int repeatStarted = 0;
+static float repeatTimer = 0.0f;
+static const float repeatInitialDelay = 0.45f; // seconds before starting repeat
+static const float repeatInterval = 0.05f;     // repeat interval in seconds
+
+// smooth scroll state when input cursor reaches bottom
+static int scrollPending = 0;         // pixels left to scroll
+static float scrollAccum = 0.0f;     // accumulated fractional pixels
+static const float scrollSpeed = 180.0f; // pixels per second for smooth scroll
+
 static void RunLua(void);
 static void InsertCharacter(char* line, int32_t pos, char c);
 static void BackSpace(char* line, int32_t pos);
 static void PushConsoleLog(const char *text);
 static void GetCommandArgs(Console *console);
+static void PrintTextColoredBuffer(const char* text, Vector2 *position);
+static void PrintIntro(void);
 
 // CONSOLE LOG
 #define CONSOLE_LOG_MAX 1024
@@ -45,24 +61,8 @@ Console InitConsole(void){
 
   L = InitLuaState(); 
 
-  // intro shown on console start
-  Vector2 pos = GetCursorPosition();
-  ChangeTextCurrentColor(6);
-  PrintText("Nano-", &pos);
-  ChangeTextCurrentColor(8);
-  PrintText("8", &pos);
-  ChangeTextCurrentColor(6);
-  PrintText(" v0.0.1\n", &pos);
-  pos.x = FONTWIDTH;
-  PrintText("by ", &pos);
-  ChangeTextCurrentColor(14);
-  PrintText("Yanji Games\n", &pos);
-  ChangeTextCurrentColor(6);
-  pos.y += FONTHEIGHT;
-  pos.x = FONTWIDTH;
-  PrintText("Type 'help' for help.\n", &pos);
-  pos.y += FONTHEIGHT;
-  SetCursorPosition(pos);
+  // print the intro 
+  PrintIntro();
   return newConsole;
 }
 
@@ -75,10 +75,29 @@ void UpdateConsole(Console *console){
 
   Vector2 curPosition = GetCursorPosition();
 
-  // TODO: CHECK THIS SOON, USE CAMERA INSTEAD
-  if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){ 
-    ScrollUpScreen(FONTHEIGHT * SCREENSCALE);
-    SetCursorPosition((Vector2){curPosition.x, curPosition.y - FONTHEIGHT * SCREENSCALE});
+  // smooth scrolling when cursor reaches near bottom of screen
+  // instead of jumping by a full line, schedule a pixel-by-pixel scroll
+  if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){
+    if(scrollPending == 0){
+      scrollPending = FONTHEIGHT * SCREENSCALE;
+      scrollAccum = 0.0f;
+    }
+  }
+
+  // process any pending smooth scroll (driven by time so it's smooth)
+  if(scrollPending > 0){
+    scrollAccum += GetFrameTime() * scrollSpeed;
+    int steps = (int)scrollAccum;
+    if(steps > 0){
+      if(steps > scrollPending) steps = scrollPending;
+      ScrollUpScreen(steps);
+      // move cursor up by the same number of pixels
+      Vector2 newPos = GetCursorPosition();
+      newPos.y -= steps;
+      SetCursorPosition(newPos);
+      scrollPending -= steps;
+      scrollAccum -= (float)steps;
+    }
   }
 
   // get new commad here
@@ -97,9 +116,13 @@ void UpdateConsole(Console *console){
     } else if(strcmp(console->command, "run") == 0){
       // RUN LUA PROGRAM
       RunLua();
-    } else if(strcmp(console->command, "cls") == 0 || strcmp(console->command, "clear") == 0){
+    } else if(strcmp(console->command, "cls") == 0){
       ClearScreen(0);
       SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
+    } else if(strcmp(console->command, "clear") == 0){
+      ClearScreen(0);
+      SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
+      PrintIntro();
     } else if(strcmp(commandArgs[0], "save") == 0){                 // SAVE CARTRIDGE
       if(argsCount < 2){
         ChangeTextCurrentColor(8);
@@ -175,6 +198,11 @@ void InputConsole(Console *console){
     BackSpace(console->buffer, console->cursor);
     console->cursor--;
     currentCursorPos--;
+    // start repeat handling for backspace
+    repeatActive = 1;
+    repeatKey = KEY_BACKSPACE;
+    repeatStarted = 0;
+    repeatTimer = 0.0f;
   }
 
   if(IsKeyPressed(KEY_ENTER)){
@@ -193,11 +221,23 @@ void InputConsole(Console *console){
   if(IsKeyPressed(KEY_LEFT) && console->cursor > 0){
     // move cursor left one position if not at start
     console->cursor--;
+    // start repeat handling for left arrow
+    repeatActive = 1;
+    repeatKey = KEY_LEFT;
+    repeatStarted = 0;
+    repeatTimer = 0.0f;
   }
   if(IsKeyPressed(KEY_RIGHT)){
     // move cursor right but not past the current buffer length
     int32_t bufLen = (int32_t)strlen(console->buffer);
-    if(console->cursor < bufLen) console->cursor++;
+    if(console->cursor < bufLen){
+      console->cursor++;
+      // start repeat handling for right arrow
+      repeatActive = 1;
+      repeatKey = KEY_RIGHT;
+      repeatStarted = 0;
+      repeatTimer = 0.0f;
+    }
   }
 
   // History navigation: Up = previous, Down = next (like pico-8)
@@ -234,6 +274,54 @@ void InputConsole(Console *console){
       currentCursorPos = 0;
     }
   }
+
+  // key long-press repeat handling (left, right, backspace)
+  if(repeatActive){
+    if(IsKeyDown(repeatKey)){
+      repeatTimer += GetFrameTime();
+      if(!repeatStarted){
+        if(repeatTimer >= repeatInitialDelay){
+          // initial repeat action
+          if(repeatKey == KEY_LEFT){
+            if(console->cursor > 0) console->cursor--;
+          } else if(repeatKey == KEY_RIGHT){
+            int32_t bufLen = (int32_t)strlen(console->buffer);
+            if(console->cursor < bufLen) console->cursor++;
+          } else if(repeatKey == KEY_BACKSPACE){
+            if(console->cursor > 0){
+              BackSpace(console->buffer, console->cursor);
+              console->cursor--;
+              currentCursorPos--;
+            }
+          }
+          repeatStarted = 1;
+          repeatTimer = 0.0f;
+        }
+      } else {
+        if(repeatTimer >= repeatInterval){
+          // repeated action
+          if(repeatKey == KEY_LEFT){
+            if(console->cursor > 0) console->cursor--;
+          } else if(repeatKey == KEY_RIGHT){
+            int32_t bufLen = (int32_t)strlen(console->buffer);
+            if(console->cursor < bufLen) console->cursor++;
+          } else if(repeatKey == KEY_BACKSPACE){
+            if(console->cursor > 0){
+              BackSpace(console->buffer, console->cursor);
+              console->cursor--;
+              currentCursorPos--;
+            }
+          }
+          repeatTimer = 0.0f;
+        }
+      }
+    } else {
+      // key released -> stop repeating
+      repeatActive = 0;
+      repeatStarted = 0;
+      repeatTimer = 0.0f;
+    }
+  }
 }
 
 void DrawConsole(Console *console){
@@ -256,11 +344,12 @@ void DrawConsole(Console *console){
     PrintText(">", &position);
     position.x += FONTWIDTH;
   }
-  ChangeTextCurrentColor(6);
   // remember where the buffer starts so we can compute the cursor draw position
   int32_t bufferStartX = position.x;
   int32_t bufferStartY = position.y;
-  PrintText(console->buffer, &position);
+  // print buffer with simple syntax highlighting for keywords, numbers and symbols
+  PrintTextColoredBuffer(console->buffer, &position);
+  ChangeTextCurrentColor(6);
 
   // draw cursor at `console->cursor` column instead of relying on the printed position
   int32_t bufLen = (int32_t)strlen(console->buffer);
@@ -395,4 +484,107 @@ static void GetCommandArgs(Console *console){
     text[textCount++] = console->command[index];
     index++;
   }
+}
+
+// Simple syntax highlighting for the input buffer printed in the console.
+// Highlights specific keywords, numbers and symbols by changing the text color
+// before calling PrintText for each token.
+static void PrintTextColoredBuffer(const char* text, Vector2 *position){
+  // colors chosen from existing palette indices used elsewhere
+  const int32_t KEYWORD_COLOR = 12;
+  const int32_t NUMBER_COLOR = 13;
+  const int32_t SYMBOL_COLOR = 9; // reuse error color for symbols
+  const int32_t DEFAULT_COLOR = 6;
+
+  const char *keywords[] = {
+    "run","help","cd","save","load","rm","mkdir","clear","cls","exit","nano","print","reboot",NULL
+  };
+
+  int32_t len = (int32_t)strlen(text);
+  int32_t i = 0;
+  while(i < len){
+    // whitespace: print as-is using default color
+    if(isspace((unsigned char)text[i])){
+      char buf[2] = { text[i], '\0' };
+      ChangeTextCurrentColor(DEFAULT_COLOR);
+      PrintText(buf, position);
+      i++;
+      continue;
+    }
+
+    // identifier/word (letters only)
+    if(isalpha((unsigned char)text[i])){
+      char token[256];
+      int32_t t = 0;
+      while(i < len && isalpha((unsigned char)text[i])){
+        if(t < (int)sizeof(token)-1) token[t++] = text[i];
+        i++;
+      }
+      token[t] = '\0';
+
+      // check if token is one of the keywords
+      int32_t is_kw = 0;
+      for(int k=0; keywords[k] != NULL; k++){
+        if(strcmp(token, keywords[k]) == 0){ is_kw = 1; break; }
+      }
+
+      ChangeTextCurrentColor(is_kw ? KEYWORD_COLOR : DEFAULT_COLOR);
+      PrintText(token, position);
+      continue;
+    }
+
+    // number token
+    if(isdigit((unsigned char)text[i])){
+      char token[256];
+      int t = 0;
+      while(i < len && isdigit((unsigned char)text[i])){
+        if(t < (int)sizeof(token)-1) token[t++] = text[i];
+        i++;
+      }
+      token[t] = '\0';
+      ChangeTextCurrentColor(NUMBER_COLOR);
+      PrintText(token, position);
+      continue;
+    }
+
+    // symbols/punctuation: group contiguous non-alnum non-space characters
+    {
+      char token[64];
+      int t = 0;
+      while(i < len && !isalnum((unsigned char)text[i]) && !isspace((unsigned char)text[i])){
+        if(t < (int)sizeof(token)-1) token[t++] = text[i];
+        i++;
+      }
+      token[t] = '\0';
+      ChangeTextCurrentColor(SYMBOL_COLOR);
+      PrintText(token, position);
+      continue;
+    }
+  }
+}
+
+static void PrintIntro(void){
+  // intro shown on console start
+  Vector2 pos = GetCursorPosition();
+  ChangeTextCurrentColor(12);
+  PrintText("nano", &pos);
+  ChangeTextCurrentColor(13);
+  PrintText("8 ", &pos);
+  ChangeTextCurrentColor(6);
+  PrintText(NANO8_VERSION_NAME, &pos);
+  pos.x = FONTWIDTH;
+  PrintText("\nby ", &pos);
+  ChangeTextCurrentColor(14);
+  PrintText("Yanji Games\n", &pos);
+  ChangeTextCurrentColor(6);
+  pos.y += FONTHEIGHT;
+  pos.x = FONTWIDTH;
+  PrintText("Type '", &pos);
+  ChangeTextCurrentColor(12);
+  PrintText("help", &pos);
+  ChangeTextCurrentColor(6);
+  PrintText("' for help\n", &pos);
+  pos.y += FONTHEIGHT;
+  pos.x = FONTWIDTH;
+  SetCursorPosition(pos);
 }

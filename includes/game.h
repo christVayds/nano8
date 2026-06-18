@@ -12,6 +12,7 @@
 #define SCREENSCALE 4         // Window scale 
 #define MAXFPS 30             // max fps
 #define TILESIZE 8
+#define NANO8_VERSION_NAME "v0.0.1"
 
 // MAPS
 #define MAPWIDTH 128
@@ -34,6 +35,9 @@
 #define FONTCOUNT 96
 #define FONTWIDTH 4 
 #define FONTHEIGHT 6
+
+// SFX and MUSIC 
+#define MAXCHANNELS 4
 
 void GameRunning(bool run);
 bool GameIsRunning(void);
