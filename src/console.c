@@ -70,6 +70,16 @@ void CloseConsole(){
   lua_close(L);
 }
 
+// clear the console log and reset internal state
+void ClearConsoleLog(void){
+  // reset the stored console log lines
+  for(int32_t i=0;i<CONSOLE_LOG_MAX;i++){
+    console_log[i][0] = '\0';
+  }
+  consoleLogCount = 0;
+  consoleBack = 0;
+}
+
 void UpdateConsole(Console *console){
   PoolInput();
 
@@ -112,18 +122,39 @@ void UpdateConsole(Console *console){
 
     // EXIT NANO 8
     if(strcmp(console->command, "exit") == 0){
+      // QUIT NANO8
       GameRunning(0);
     } else if(strcmp(console->command, "run") == 0){
       // RUN LUA PROGRAM
       RunLua();
     } else if(strcmp(console->command, "cls") == 0){
+      // TOTAL CLEAR SCREEN 
       ClearScreen(0);
       SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
     } else if(strcmp(console->command, "clear") == 0){
+      // CLEAR THE SCREEN THEN PRINT THE INTRO OF NANO8
       ClearScreen(0);
       SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
       PrintIntro();
-    } else if(strcmp(commandArgs[0], "save") == 0){                 // SAVE CARTRIDGE
+    } else if(strcmp(console->command, "reboot") == 0){
+      // REBOOT NANO 8
+      ClearNano8(1);
+      
+      ClearScreen(0);
+      SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
+      PrintIntro(); 
+    } else if(strcmp(console->command, "template") == 0){
+      // JUST ADD A TEMPLATE (_init, _update, _draw functions)
+      const char* startUpCode = "-- your first Nano-8 lua code\nfunction _init()\n\nend\n\nfunction _update()\n\nend\n\nfunction _draw()\n  cls()\n  print(\"hello Nano-8\")\nend";
+      LoadCode(startUpCode, strlen(startUpCode));
+      
+      ChangeTextCurrentColor(6);
+      PrintText("functions template added", &position);
+      position.y += FONTHEIGHT;
+      position.x = FONTWIDTH;
+      SetCursorPosition((Vector2){position.x, position.y});
+    } else if(strcmp(commandArgs[0], "save") == 0){
+      // SAVE CARTRIDGE
       if(argsCount < 2){
         ChangeTextCurrentColor(8);
         PrintText("Invalid argument", &position);
@@ -141,8 +172,10 @@ void UpdateConsole(Console *console){
 
         SaveCartridge(commandArgs[1]);
       }
-    } else if(strcmp(commandArgs[0], "load") == 0){                   // LOAD CARTRIDGE
+    } else if(strcmp(commandArgs[0], "load") == 0){
+      // LOAD CARTRIDGE
       if(argsCount < 2){
+        // IF EMPTY FILE NAME RETURN ERROR
         ChangeTextCurrentColor(8);
         PrintText("Invalid argument", &position);
         position.y += FONTHEIGHT;
@@ -151,13 +184,16 @@ void UpdateConsole(Console *console){
       } else {
         PushConsoleLog(console->command);
 
+        ClearNano8(0); // clear nano8 first
         if(!LoadCartridge(commandArgs[1])){
+          // IF CARTRIDGE FILE NAME IS NOT FOUND 
           ChangeTextCurrentColor(8);
           PrintText("Cartridge not found", &position);
           position.y += FONTHEIGHT;
           position.x = FONTWIDTH;
           SetCursorPosition((Vector2){position.x, position.y});
         } else {
+          // load the cartridge 
           ChangeTextCurrentColor(8);
           PrintText("loaded", &position);
           position.y += FONTHEIGHT;
@@ -497,7 +533,7 @@ static void PrintTextColoredBuffer(const char* text, Vector2 *position){
   const int32_t DEFAULT_COLOR = 6;
 
   const char *keywords[] = {
-    "run","help","cd","save","load","rm","mkdir","clear","cls","exit","nano","print","reboot",NULL
+    "run","help","cd","save","load","rm","mkdir","clear","cls","exit","nano","print","template","reboot",NULL
   };
 
   int32_t len = (int32_t)strlen(text);

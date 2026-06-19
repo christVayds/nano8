@@ -44,8 +44,6 @@ int main(){
   // ------------------
   InitEditor();
   ResetLuaForEditor();
-  //const char* startUpCode = "-- your first Nano-8 lua code\nfunction _init()\n\nend\n\nfunction _update()\n\nend\n\nfunction _draw()\n  cls()\n  print(\"hello Nano-8\")\nend";
-  //LoadCode(startUpCode, strlen(startUpCode)); 
 
   // ------------------
   //  SPRITE EDITOR 

@@ -310,7 +310,6 @@ function _draw()
     drawBullet(player.bullets[i])
   end
 end
-
 __SECTION__
 -- player
 speed = 2
@@ -343,8 +342,6 @@ end
 function drawPlayer(player)
   spr(player.sp, player.x, player.y)
 end
-
-
 __SECTION__
 -- bullet
 function newBullet(px, py)
@@ -363,8 +360,6 @@ end
 function drawBullet(bullet)
   spr(16, bullet.x, bullet.y)
 end
-
-
 __SECTION__
 -- effects
 rain = {}
@@ -398,20 +393,3 @@ function drawRain()
     rectfill(x, y, x+1, y+1, 6)
   end
 end
-
-
-__SECTION__
-
-
-__SECTION__
-
-
-__SECTION__
-
-
-__SECTION__
-
-
-__SECTION__
-
-

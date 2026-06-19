@@ -6,6 +6,8 @@
 
 #include "sprite.h"
 #include "maps.h"
+#include "editor.h"
+#include "console.h"
 
 static bool running = true;
 static int32_t textCurrentColor = 7;
@@ -1234,14 +1236,24 @@ void DrawIcons(uint32_t iconIndex, Vector2 position, int32_t colorIndex){
   }
 }
 
-void ClearConsole(void){
-  // TODO:
-  // [] clear code editor 
-  // [] clear sprite editor
-  // [] flags
-  // [] clear map editor
-  memset(mapData, 0, sizeof(mapData));
-  // [] clear sfx editor 
-  // [] clear music editor
+void ClearNano8(const bool clearConsole){
+  // reset code editor sections
+  FreeSections();
+  InitSection();
+
+  // reset sprites and sprite flags
+  SpriteFree();
+  SpriteInit();
+
+  // reset map editor and map data
+  MapInit();
+
+  if(clearConsole){
+    // clear console log
+    ClearConsoleLog();
+
+    // clear screen buffer
+    ClearScreen(0);
+  }
 }
 
