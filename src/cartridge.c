@@ -61,7 +61,13 @@ void SaveCartridge(const char* filename){
 
   for(int32_t i=0;i<GetEditorSectionCount()+1;i++){
     char* code = GetLuaCodeInSection(i); 
-    fprintf(fp, "__SECTION__\n%s", code);
+      // ensure section marker is on its own line; add a trailing newline only if code doesn't already end with one
+      size_t clen = strlen(code);
+      if(clen > 0 && code[clen-1] == '\n'){
+        fprintf(fp, "__SECTION__\n%s", code);
+      } else {
+        fprintf(fp, "__SECTION__\n%s\n", code);
+      }
     free(code);
   }
 
@@ -146,7 +152,7 @@ bool LoadCartridge(const char* filename){
         }
         break;
       case CART_LUA:{
-        if(strncmp(line, "__SECTION__", 11) == 0){
+        if(strncmp(line, "__SECTION__\n", 11) == 0){
           if(codeCount > 0)
             NewSection();
           codeCount++;

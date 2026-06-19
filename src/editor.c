@@ -45,6 +45,8 @@ static void BackSpace(int32_t pos);
 static void CountToken(void);
 static void DrawSelection(void);
 
+static void RemoveSectionAt(int32_t idx);
+
 static int isKeyword(const char* str);
 static int isFunc(const char* str);
 static int isSymbol(const char c);
@@ -103,7 +105,7 @@ char *GetLuaCode(void){
     ptr = code + strlen(code);
 
     // write 
-    int write = sprintf(ptr, "%s\n", sections.codeEditor[i].code);
+    int write = sprintf(ptr, "%s", sections.codeEditor[i].code);
     ptr += write;
   }
 
@@ -119,7 +121,7 @@ char *GetLuaCodeInSection(int32_t si){
   char *ptr = code;
 
   // write 
-  int write = sprintf(ptr, "%s\n", sections.codeEditor[si].code);
+  int write = sprintf(ptr, "%s", sections.codeEditor[si].code);
   ptr += write;
 
   return code;
@@ -163,14 +165,45 @@ void InputEditor(void){
 
   // CONTROL RIGHT KEY - MOVE SECTIONS RIGHT SIDE
   if(IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_RIGHT)){
+    // auto-remove empty current section when switching (only if more than one section exists)
+    if(sections.sectionsCount > 0){
+      CodeEditor *cur = &sections.codeEditor[sections.sectionCurrent];
+      bool empty = true;
+      for(int32_t i=0;i<cur->codeCount;i++){
+        char ch = cur->code[i];
+        if(ch != '\0' && ch != '\n' && ch != ' ' && ch != '\t' && ch != '\r'){
+          empty = false; break;
+        }
+      }
+      if(empty && sections.sectionsCount > 0){
+        RemoveSectionAt(sections.sectionCurrent);
+      }
+    }
+
     if(sections.sectionCurrent < sections.sectionsCount)
       sections.sectionCurrent++;
-    else sections.sectionCurrent=0;
+    else sections.sectionCurrent = 0;
 
     return;
   }
   // CONTROL LEFT KEY - MOVE SECTION LEFT SIDE 
   if(IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_LEFT)){
+    // auto-remove empty current section when switching (only if more than one section exists)
+    if(sections.sectionsCount > 0){
+      CodeEditor *cur = &sections.codeEditor[sections.sectionCurrent];
+      bool empty = true;
+      for(int32_t i=0;i<cur->codeCount;i++){
+        char ch = cur->code[i];
+        if(ch != '\0' && ch != '\n' && ch != ' ' && ch != '\t' && ch != '\r'){
+          empty = false; break;
+        }
+      }
+      if(empty && sections.sectionsCount > 0){
+        // if removing the current and it's the first, after removal we want to land on the last valid index
+        RemoveSectionAt(sections.sectionCurrent);
+      }
+    }
+
     if(sections.sectionCurrent > 0)
       sections.sectionCurrent--;
     else sections.sectionCurrent = sections.sectionsCount;
@@ -787,9 +820,35 @@ int32_t GetEditorSectionCount(void){
   return sections.sectionsCount;
 }
 
-// TODO: do this
-void RemoveSection(void){
+static void RemoveSectionAt(int32_t idx){
+  if(idx < 0 || idx > sections.sectionsCount) return;
 
+  // do not remove the last remaining section
+  if(sections.sectionsCount == 0) return;
+
+  // free code buffer for the section being removed
+  if(sections.codeEditor[idx].code){
+    free(sections.codeEditor[idx].code);
+    sections.codeEditor[idx].code = NULL;
+  }
+
+  // shift subsequent sections down by one
+  for(int32_t i=idx;i<sections.sectionsCount;i++){
+    sections.codeEditor[i] = sections.codeEditor[i+1];
+  }
+
+  // decrease section count
+  sections.sectionsCount--;
+
+  // shrink the allocated array
+  if(sections.sectionsCount >= 0){
+    CodeEditor *tmp = realloc(sections.codeEditor, sizeof(CodeEditor) * (sections.sectionsCount + 1));
+    if(tmp) sections.codeEditor = tmp;
+  }
+
+  // ensure current index is within bounds
+  if(sections.sectionCurrent > sections.sectionsCount)
+    sections.sectionCurrent = sections.sectionsCount;
 }
 
 static void CountToken(void){
@@ -869,5 +928,7 @@ static void DrawSelection(void){
 }
 
 void ResetSection(void){
-
+  // free any existing sections and re-initialize a single empty section
+  FreeSections();
+  InitSection();
 }
