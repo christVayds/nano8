@@ -7,7 +7,8 @@
 void InitNanoButtonText(NanoButton *button, Rectangle rect, const char* textLabel, bool border){
   button->rect = rect;
   button->labelType = 1;
-  strcpy(button->textLabel, textLabel);
+  strncpy(button->textLabel, textLabel, sizeof(button->textLabel) - 1);
+  button->textLabel[sizeof(button->textLabel) - 1] = '\0';
 
   button->hovered = false;
   button->clicked = false;
@@ -20,7 +21,8 @@ void InitNanoButtonIcon(NanoButton *button, Rectangle rect, const char* textLabe
   button->rect = rect;
   button->labelType = 0;
   button->iconLabel = icon;
-  strcpy(button->textLabel, textLabel);
+  strncpy(button->textLabel, textLabel, sizeof(button->textLabel) - 1);
+  button->textLabel[sizeof(button->textLabel) - 1] = '\0';
 
   button->hovered = false;
   button->clicked = false;

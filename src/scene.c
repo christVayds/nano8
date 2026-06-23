@@ -46,12 +46,17 @@ void InputScene(Scene *scene){
     switch(scene->sceneType){
       case SCENE_CONSOLE:         // go to editor 
         if(GetCartIfRunning()){
+          // if console/cartrige is running 
           SetCartRunning(false);
           CloseEditor();
           ResetLuaForEditor();
+          SetCursorPosition((Vector2){FONTWIDTH, SCREENSCALE});
         } else {
+          // if cartridge is not running 
           scene->sceneType = SCENE_EDITOR;
           ShowCursor();
+
+          // reset the color pallete to default
           Pal(0,0);
           Palt(0,0, true);
         }

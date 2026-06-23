@@ -20,6 +20,10 @@ static int currentCursorPos = 0;
 static int32_t inputLineY = -1;
 static int32_t inputLineMaxY = 0;
 
+// working directory 
+static char *workingDirectory = "tests/";
+static char currentCartName[256];
+
 // key repeat state for long-press behavior
 static int repeatKey = 0;
 static int repeatActive = 0;
@@ -39,6 +43,7 @@ static void BackSpace(char* line, int32_t pos);
 static void PushConsoleLog(const char *text);
 static void GetCommandArgs(Console *console);
 static void PrintTextColoredBuffer(const char* text, Vector2 *position);
+static void PrintCartRuntimeError(const char *message);
 static void PrintIntro(void);
 
 // CONSOLE LOG
@@ -89,7 +94,7 @@ void UpdateConsole(Console *console){
   // instead of jumping by a full line, schedule a pixel-by-pixel scroll
   if(curPosition.y > (SCREENHEIGHT - (FONTHEIGHT*SCREENSCALE))){
     if(scrollPending == 0){
-      scrollPending = FONTHEIGHT * SCREENSCALE;
+      scrollPending = FONTHEIGHT;
       scrollAccum = 0.0f;
     }
   }
@@ -155,22 +160,69 @@ void UpdateConsole(Console *console){
       SetCursorPosition((Vector2){position.x, position.y});
     } else if(strcmp(commandArgs[0], "save") == 0){
       // SAVE CARTRIDGE
-      if(argsCount < 2){
-        ChangeTextCurrentColor(8);
-        PrintText("Invalid argument", &position);
-        position.y += FONTHEIGHT;
-        position.x = FONTWIDTH;
-        SetCursorPosition((Vector2){position.x, position.y});  
-      } else {
-        PushConsoleLog(console->command);
+      PushConsoleLog(console->command);
 
-        ChangeTextCurrentColor(6);
+      if(argsCount < 2){
+        if(currentCartName[0] != '\0'){
+          ChangeTextCurrentColor(8);
+          PrintText("saved", &position);
+          position.y += FONTHEIGHT;
+          position.x = FONTWIDTH;
+          SetCursorPosition((Vector2){position.x, position.y});
+
+          {
+            char name_with_ext[512];
+            // start with currentCartName and ensure it ends with .n8
+            strncpy(name_with_ext, currentCartName, sizeof(name_with_ext)-1);
+            name_with_ext[sizeof(name_with_ext)-1] = '\0';
+            size_t nlen = strlen(name_with_ext);
+            if(nlen < 3 || strcmp(name_with_ext + nlen - 3, ".n8") != 0){
+              if(nlen + 3 < sizeof(name_with_ext)){
+                strncat(name_with_ext, ".n8", sizeof(name_with_ext) - nlen - 1);
+              }
+            }
+
+            char fileDir[1028];
+            snprintf(fileDir, sizeof(fileDir), "%s%s", workingDirectory, name_with_ext);
+            fileDir[sizeof(fileDir)-1] = '\0';
+            SaveCartridge(fileDir);
+            // also update currentCartName to include extension
+            strncpy(currentCartName, name_with_ext, sizeof(currentCartName)-1);
+            currentCartName[sizeof(currentCartName)-1] = '\0';
+          }
+        } else {
+          ChangeTextCurrentColor(8);
+          PrintText("Invalid argument", &position);
+          position.y += FONTHEIGHT;
+          position.x = FONTWIDTH;
+          SetCursorPosition((Vector2){position.x, position.y});
+        }
+      } else { 
+        ChangeTextCurrentColor(8);
         PrintText("saved", &position);
         position.y += FONTHEIGHT;
         position.x = FONTWIDTH;
         SetCursorPosition((Vector2){position.x, position.y});
 
-        SaveCartridge(commandArgs[1]);
+        {
+          char name_with_ext[512];
+          strncpy(name_with_ext, commandArgs[1], sizeof(name_with_ext)-1);
+          name_with_ext[sizeof(name_with_ext)-1] = '\0';
+          size_t nlen = strlen(name_with_ext);
+          if(nlen < 3 || strcmp(name_with_ext + nlen - 3, ".n8") != 0){
+            if(nlen + 3 < sizeof(name_with_ext)){
+              strncat(name_with_ext, ".n8", sizeof(name_with_ext) - nlen - 1);
+              nlen += 3;
+            }
+          }
+
+          char fileDir[1028];
+          snprintf(fileDir, sizeof(fileDir), "%s%s", workingDirectory, name_with_ext);
+          fileDir[sizeof(fileDir)-1] = '\0';
+          strncpy(currentCartName, name_with_ext, sizeof(currentCartName) - 1);
+          currentCartName[sizeof(currentCartName) - 1] = '\0';
+          SaveCartridge(fileDir);
+        }
       }
     } else if(strcmp(commandArgs[0], "load") == 0){
       // LOAD CARTRIDGE
@@ -185,26 +237,45 @@ void UpdateConsole(Console *console){
         PushConsoleLog(console->command);
 
         ClearNano8(0); // clear nano8 first
-        if(!LoadCartridge(commandArgs[1])){
-          // IF CARTRIDGE FILE NAME IS NOT FOUND 
+
+        char name_with_ext[512];
+        strncpy(name_with_ext, commandArgs[1], sizeof(name_with_ext)-1);
+        name_with_ext[sizeof(name_with_ext)-1] = '\0';
+        size_t nlen = strlen(name_with_ext);
+        if(nlen < 3 || strcmp(name_with_ext + nlen - 3, ".n8") != 0){
+          if(nlen + 3 < sizeof(name_with_ext)){
+            strncat(name_with_ext, ".n8", sizeof(name_with_ext) - nlen - 1);
+            nlen += 3;
+          }
+        }
+
+        char fileDir[1028];
+        snprintf(fileDir, sizeof(fileDir), "%s%s", workingDirectory, name_with_ext);
+        fileDir[sizeof(fileDir)-1] = '\0';
+
+        // IF CARTRIDGE FILE NAME IS NOT FOUND
+        if(!LoadCartridge(fileDir)){
           ChangeTextCurrentColor(8);
           PrintText("Cartridge not found", &position);
           position.y += FONTHEIGHT;
           position.x = FONTWIDTH;
           SetCursorPosition((Vector2){position.x, position.y});
         } else {
-          // load the cartridge 
+          // load the cartridge
           ChangeTextCurrentColor(8);
           PrintText("loaded", &position);
           position.y += FONTHEIGHT;
           position.x = FONTWIDTH;
-          SetCursorPosition((Vector2){position.x, position.y}); 
+          SetCursorPosition((Vector2){position.x, position.y});
+          strncpy(currentCartName, name_with_ext, sizeof(currentCartName) - 1);
+          currentCartName[sizeof(currentCartName) - 1] = '\0';
         }
       }
     } else { // NANO 8 CONSOLE
       // LUA ERROR - CONSOLE
       if(luaL_dostring(L, console->command) != LUA_OK){
         ChangeTextCurrentColor(8);
+        position.x = FONTWIDTH;
         PrintText(lua_tostring(L, -1), &position);
         position.y += FONTHEIGHT;
         position.x = FONTWIDTH;
@@ -224,7 +295,7 @@ void InputConsole(Console *console){
   if(GetCartIfRunning()) return;
   int key = GetCharPressed();
   
-  if(key >= 32 && console->cursor < 256){
+  if(key >= 32 && console->cursor < (int32_t)sizeof(console->buffer) - 1){
     InsertCharacter(console->buffer, console->cursor, key);
     console->cursor++;
     currentCursorPos++;
@@ -247,7 +318,8 @@ void InputConsole(Console *console){
     getCursorPosition.y += FONTHEIGHT;
     SetCursorPosition(getCursorPosition);
 
-    strcpy(console->command, console->buffer);
+    strncpy(console->command, console->buffer, sizeof(console->command) - 1);
+    console->command[sizeof(console->command) - 1] = '\0';
     memset(console->buffer, 0, sizeof(console->buffer));
     console->cursor = 0;
     currentCursorPos = 0;
@@ -286,7 +358,8 @@ void InputConsole(Console *console){
     // copy history entry into current buffer
     char *getLatestBuffer = console_log[consoleBack];
     int32_t len = (int32_t)strlen(getLatestBuffer);
-    strcpy(console->buffer, getLatestBuffer);
+    strncpy(console->buffer, getLatestBuffer, sizeof(console->buffer) - 1);
+    console->buffer[sizeof(console->buffer) - 1] = '\0';
     console->cursor = len;
     currentCursorPos = len;
   }
@@ -299,7 +372,8 @@ void InputConsole(Console *console){
       consoleBack++;
       char *getNext = console_log[consoleBack];
       int32_t len = (int32_t)strlen(getNext);
-      strcpy(console->buffer, getNext);
+      strncpy(console->buffer, getNext, sizeof(console->buffer) - 1);
+      console->buffer[sizeof(console->buffer) - 1] = '\0';
       console->cursor = len;
       currentCursorPos = len;
     } else {
@@ -439,13 +513,21 @@ static void RunLua(void){
 }
 
 static void InsertCharacter(char* line, int32_t pos, char c){
-  int32_t len = strlen(line);
+  if(!line) return;
+  int32_t len = (int32_t)strlen(line);
+  const int32_t MAXLEN = 255; // leave space for terminating NUL in 256 buffers
 
-  for(int32_t i=len;i>=pos;i--){
-    line[i + 1] = line[i];
+  // if already full, do not insert
+  if(len >= MAXLEN) return;
+
+  // shift right making sure we don't write past MAXLEN
+  for(int32_t i = len; i >= pos; i--){
+    if(i + 1 <= MAXLEN) line[i + 1] = line[i];
   }
 
-  line[pos] = c;
+  line[pos] = (char)c;
+  // ensure termination
+  if(len + 1 <= MAXLEN) line[len + 1] = '\0';
 }
 
 static void BackSpace(char* line, int32_t pos){
@@ -458,9 +540,18 @@ static void BackSpace(char* line, int32_t pos){
 }
 
 static void PushConsoleLog(const char *text){
-  if(consoleLogCount < CONSOLE_LOG_MAX)
-    strcpy(console_log[consoleLogCount++], text);
-  else return;
+  if(!text) return;
+  if(consoleLogCount < CONSOLE_LOG_MAX){
+    // copy safely, ensuring NUL termination
+    strncpy(console_log[consoleLogCount], text, sizeof(console_log[0]) - 1);
+    console_log[consoleLogCount][sizeof(console_log[0]) - 1] = '\0';
+    consoleLogCount++;
+  } else {
+    // buffer full: drop oldest entry and append new one (rotate up)
+    memmove(console_log, console_log + 1, (CONSOLE_LOG_MAX - 1) * sizeof(console_log[0]));
+    strncpy(console_log[CONSOLE_LOG_MAX - 1], text, sizeof(console_log[0]) - 1);
+    console_log[CONSOLE_LOG_MAX - 1][sizeof(console_log[0]) - 1] = '\0';
+  }
 }
 
 bool CallLuaFunction(const char* funcname){
@@ -470,20 +561,14 @@ bool CallLuaFunction(const char* funcname){
   lua_getglobal(L_editor, funcname); // push function into stack 
 
   if(lua_isfunction(L_editor, -1)){
-    Vector2 position = GetCursorPosition();
-
     // call with 0 atgs and 0 returns
     if(lua_pcall(L_editor, 0, 0, 0) != LUA_OK){
-      printf("Error in %s: %s\n", funcname, lua_tostring(L_editor, -1));
+      const char *message = lua_tostring(L_editor, -1);
+      printf("Error in %s: %s\n", funcname, message);
       
       // push error message to the console log
-      PushConsoleLog(lua_tostring(L_editor, -1));
-
-      ChangeTextCurrentColor(8);
-      PrintText(lua_tostring(L_editor, -1), &position);
-      position.y += FONTHEIGHT;
-      position.x = FONTWIDTH;
-      SetCursorPosition((Vector2){position.x, position.y});
+      PushConsoleLog(message);
+      PrintCartRuntimeError(message);
 
       lua_pop(L_editor, 1); 
      
@@ -499,26 +584,61 @@ bool CallLuaFunction(const char* funcname){
   return funcExist;
 }
 
+static void PrintCartRuntimeError(const char *message){
+  Vector2 position = {FONTWIDTH, SCREENSCALE};
+
+  NanoCameraReset();
+  DrawRectFill(0, 0, SCREENWIDTH - 1, (FONTHEIGHT * 4) - 1, 0);
+
+  ChangeTextCurrentColor(8);
+  PrintText(message, &position);
+
+  position.y += FONTHEIGHT;
+  position.x = FONTWIDTH;
+  SetCursorPosition(position);
+}
+
 static void GetCommandArgs(Console *console){
-  argsCount = 0; 
+  argsCount = 0;
+  for(int i=0;i<COMMAND_ARGS_MAX;i++) commandArgs[i][0] = '\0';
   int32_t index = 0;
-  char text[32];
+  char text[256];
   int32_t textCount = 0;
-  
-  while(true){
-    if(console->command[index] == '\0'){
-      strcpy(commandArgs[argsCount++], text);
-      return;
-    }
+
+  // initialize
+  textCount = 0;
+  text[0] = '\0';
+
+  while(console->command[index] != '\0'){
+    // skip consecutive spaces
     if(console->command[index] == ' '){
-      strcpy(commandArgs[argsCount++], text); 
+      if(textCount > 0){
+        text[textCount] = '\0';
+        if(argsCount < COMMAND_ARGS_MAX){
+          // safe copy
+          strncpy(commandArgs[argsCount], text, sizeof(commandArgs[0]) - 1);
+          commandArgs[argsCount][sizeof(commandArgs[0]) - 1] = '\0';
+          argsCount++;
+        }
+        textCount = 0;
+      }
       index++;
-      textCount = 0;
       continue;
     }
 
-    text[textCount++] = console->command[index];
+    // append character if space in text buffer
+    if(textCount < (int32_t)sizeof(text) - 1){
+      text[textCount++] = console->command[index];
+    }
     index++;
+  }
+
+  // push last token if any
+  if(textCount > 0 && argsCount < COMMAND_ARGS_MAX){
+    text[textCount] = '\0';
+    strncpy(commandArgs[argsCount], text, sizeof(commandArgs[0]) - 1);
+    commandArgs[argsCount][sizeof(commandArgs[0]) - 1] = '\0';
+    argsCount++;
   }
 }
 
@@ -532,8 +652,26 @@ static void PrintTextColoredBuffer(const char* text, Vector2 *position){
   const int32_t SYMBOL_COLOR = 9; // reuse error color for symbols
   const int32_t DEFAULT_COLOR = 6;
 
+  /*
+   * run - run program 
+   * rm - delete file or directory 
+   * help - help 
+   * cd - got to file 
+   * save - file cartridge 
+   * load - load cartridge 
+   * mkdir - make a directory 
+   * clear - clear screen in console and print intro 
+   * exit - exit nano8
+   * nano8 - open games 
+   * print - print smth 
+   * reboot - clear everything
+   * ls - show list
+  */
   const char *keywords[] = {
-    "run","help","cd","save","load","rm","mkdir","clear","cls","exit","nano","print","template","reboot",NULL
+    "run", "help", "cd", "save", "load",
+    "rm", "mkdir", "clear", "cls", "exit",
+    "nano8", "print", "template", "reboot",
+    "ls", NULL
   };
 
   int32_t len = (int32_t)strlen(text);

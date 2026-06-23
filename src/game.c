@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "sprite.h"
 #include "maps.h"
@@ -16,8 +17,6 @@ static Vector2 camera = {0,0};
 // MAP DATA 
 extern int8_t mapData[MAPWIDTH*MAPHEIGHT];
 extern SpriteFlags spriteFlags[16*16];
-
-char *workingDirectory = "test/";
 
 // ------------------
 //  FONTS 
@@ -986,19 +985,19 @@ void DrawScreen(void){
 }
 
 void ScrollUpScreen(int32_t amount){
-  for(int32_t y=amount;y<SCREENHEIGHT;y++){
-    for(int32_t x=0;x<SCREENWIDTH;x++){
-      int32_t i = y * SCREENWIDTH + x;
-      Screen[(y - amount) * SCREENWIDTH + x] = Screen[i]; 
-    }
+  if(GetCartIfRunning()) return;
+
+  if(amount <= 0) return;
+  if(amount >= SCREENHEIGHT){
+    ClearScreen(0);
+    return;
   }
 
+  const int32_t visibleRows = SCREENHEIGHT - amount;
+  memmove(Screen, Screen + (amount * SCREENWIDTH), visibleRows * SCREENWIDTH * sizeof(Screen[0]));
+
   // clear bottom area 
-  for(int32_t y = SCREENHEIGHT - amount;y < SCREENHEIGHT;y++){
-    for(int32_t x=0;x<SCREENWIDTH;x++){
-      Screen[y * SCREENWIDTH + x] = 0;
-    }
-  }
+  memset(Screen + (visibleRows * SCREENWIDTH), 0, amount * SCREENWIDTH * sizeof(Screen[0]));
 }
 
 void DrawScreenLine(int32_t posx1, int32_t posy1, int32_t posx2, int32_t posy2, int32_t colorIndex){
@@ -1036,12 +1035,15 @@ void DrawRectFill(int32_t x, int32_t y, int32_t width, int32_t height, int32_t c
 }
 
 void DrawCircFill(int32_t cx, int32_t cy, int32_t radius, int32_t colorIndex){
-  for(int32_t y = -radius;y<=radius;y++){
-    for(int32_t x = -radius;x<=radius;x++){
-      if((x*x)+(y*y) <= radius*radius){
-        pset(cx + x, cy + y, colorIndex);
-      }
-    }
+  // Draw filled circle using horizontal scanlines.
+  // For each y offset, compute half-width via sqrt to ensure symmetry
+  // and smoother appearance versus naive per-pixel distance checks.
+  for(int32_t y = -radius; y <= radius; y++){
+    int32_t yy = y * y;
+    int32_t r2 = radius * radius;
+    if(yy > r2) continue;
+    int32_t dx = (int32_t)floor(sqrt((double)(r2 - yy)));
+    DrawScreenLine(cx - dx, cy + y, cx + dx, cy + y, colorIndex);
   }
 }
 
@@ -1256,4 +1258,3 @@ void ClearNano8(const bool clearConsole){
     ClearScreen(0);
   }
 }
-

@@ -41,9 +41,21 @@ static bool arrowKeyHeldDown = false;
 static void DrawSomeText(char *texts, Vector2 position);
 static void DrawTextEditor(Vector2 *position);
 static void InsertCharacter(int32_t pos, char c);
-static void BackSpace(int32_t pos);
+static void DeleteCharacterAt(int32_t pos);
+static int32_t SmartBackspace(CodeEditor *codeEditor);
 static void CountToken(void);
 static void DrawSelection(void);
+static int32_t GetLineStart(CodeEditor *codeEditor, int32_t pos);
+static int32_t GetLineEnd(CodeEditor *codeEditor, int32_t pos);
+static int32_t GetLineLeadingSpaces(CodeEditor *codeEditor, int32_t lineStart);
+static bool LineOpensBlock(CodeEditor *codeEditor, int32_t lineStart, int32_t lineEnd);
+static void InsertSpacesAtCursor(CodeEditor *codeEditor, int32_t count);
+static void DeleteSelection(CodeEditor *codeEditor);
+static bool GetNormalizedSelection(int32_t *start, int32_t *end);
+static void IndentSelectedLines(CodeEditor *codeEditor);
+static void UnindentSelectedLines(CodeEditor *codeEditor);
+static void SmartIndentCurrentLine(CodeEditor *codeEditor);
+static void SmartUnindentCurrentLine(CodeEditor *codeEditor);
 
 static void RemoveSectionAt(int32_t idx);
 
@@ -92,21 +104,24 @@ lua_State *GetEditorLua(void){
 
 // NOTE: can memory leak
 char *GetLuaCode(void){  
-  char *code = malloc(sizeof(char));
-  int32_t codeSize = (int32_t)sizeof(char);
+  char *code = malloc(1);
   if(!code) return NULL;
-
   code[0] = '\0';
-  char *ptr = code;
-  for(int32_t i=0;i<=sections.sectionsCount;i++){
-    codeSize += sections.codeEditor[i].codeCount +2;
-    code = realloc(code, codeSize * sizeof(char));
-    if(!code) return NULL;
-    ptr = code + strlen(code);
 
-    // write 
-    int write = sprintf(ptr, "%s", sections.codeEditor[i].code);
-    ptr += write;
+  for(int32_t i=0;i<=sections.sectionsCount;i++){
+    size_t len = strlen(code);
+    size_t add = (size_t)sections.codeEditor[i].codeCount;
+    size_t newSize = len + add + 1; // +1 for terminating NUL
+
+    char *tmp = realloc(code, newSize);
+    if(!tmp){ free(code); return NULL; }
+    code = tmp;
+
+    // append the section code safely
+    if(add > 0){
+      memcpy(code + len, sections.codeEditor[i].code, add);
+    }
+    code[len + add] = '\0';
   }
 
   return code;
@@ -114,25 +129,37 @@ char *GetLuaCode(void){
 
 char *GetLuaCodeInSection(int32_t si){
   // si = section index
-  char *code = malloc(sizeof(char) * sections.codeEditor[si].codeCount +2);
+  size_t add = (size_t)sections.codeEditor[si].codeCount;
+  char *code = malloc(add + 1);
   if(!code) return NULL;
-
-  code[0] = '\0';
-  char *ptr = code;
-
-  // write 
-  int write = sprintf(ptr, "%s", sections.codeEditor[si].code);
-  ptr += write;
-
+  if(add > 0){
+    memcpy(code, sections.codeEditor[si].code, add);
+  }
+  code[add] = '\0';
   return code;
 }
 
 // load a lua code
 void LoadCode(const char* luaCode, size_t size){
   CodeEditor *codeEditor = &sections.codeEditor[sections.sectionCurrent];
-  
+  if(!luaCode || size == 0) return;
+
+  // ensure destination buffer has space for new data + terminating NUL
+  if(codeEditor->codeCount + (int32_t)size + 1 > codeEditor->codeSize){
+    int32_t needed = (int32_t)size + 1;
+    int32_t newSize = codeEditor->codeSize;
+    while(codeEditor->codeCount + needed + 0 > newSize) newSize += TEXTSIZE;
+    char *tmp = realloc(codeEditor->code, newSize);
+    if(!tmp){
+      printf("LoadCode: memory allocation failed\n");
+      return;
+    }
+    codeEditor->code = tmp;
+    codeEditor->codeSize = newSize;
+  }
+
   memcpy(codeEditor->code + codeEditor->codeCount, luaCode, sizeof(char) * size);
-  codeEditor->codeCount += size;
+  codeEditor->codeCount += (int32_t)size;
   codeEditor->code[codeEditor->codeCount] = '\0';
 }
 
@@ -149,6 +176,7 @@ void InputEditor(void){
   // GET USER KEY INPUTS 
   int key = GetCharPressed();
   if(key >= 32 && tokenCount < TOKENLIMIT){
+    if(selecting) DeleteSelection(codeEditor);
     InsertCharacter(codeEditor->cursor, key); 
     codeEditor->cursor++;
     selecting = false;
@@ -292,51 +320,52 @@ void InputEditor(void){
     }
   }
 
-  // TEXT TAB (2 SPACES)
+  // TEXT TAB
   if(IsKeyPressed(KEY_TAB) && tokenCount < TOKENLIMIT){
-    for(int32_t i=0;i<TABSIZE;i++){ 
-      InsertCharacter(codeEditor->cursor, ' ');
-      codeEditor->cursor++;
+    if(IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)){
+      if(selecting) UnindentSelectedLines(codeEditor);
+      else SmartUnindentCurrentLine(codeEditor);
+    } else {
+      if(selecting) IndentSelectedLines(codeEditor);
+      else SmartIndentCurrentLine(codeEditor);
     }
-    indentCount += 2;
+    indentCount = GetLineLeadingSpaces(codeEditor, GetLineStart(codeEditor, codeEditor->cursor));
   }
 
   // ENTER 
   if(IsKeyPressed(KEY_ENTER) && tokenCount < TOKENLIMIT){
+    if(selecting) DeleteSelection(codeEditor);
+    int32_t lineStart = GetLineStart(codeEditor, codeEditor->cursor);
+    int32_t lineEnd = GetLineEnd(codeEditor, codeEditor->cursor);
+    int32_t indent = GetLineLeadingSpaces(codeEditor, lineStart);
+    if(LineOpensBlock(codeEditor, lineStart, lineEnd)) indent += TABSIZE;
+
     InsertCharacter(codeEditor->cursor, '\n');
     codeEditor->cursor++;
-    
-    if(indentCount > codeEditor->cursorColumn) indentCount = codeEditor->cursorColumn-1;
-    if(indentCount > 0){
-      for(int32_t i=0;i<indentCount;i++){ 
-        InsertCharacter(codeEditor->cursor, ' ');
-        codeEditor->cursor++;
-      }
-    }
+    InsertSpacesAtCursor(codeEditor, indent);
+    indentCount = indent;
   }
 
   // BACKSPACE 
   if(IsKeyDown(KEY_BACKSPACE) && codeEditor->cursor >= 1){
     if(!backSpaceHeld){
-      BackSpace(codeEditor->cursor);
-      codeEditor->cursor--;
+      int32_t removed = SmartBackspace(codeEditor);
       
       backSpaceHoldTime = 0.0f;
       backSpaceRepeatTimer = 0.5f;
       backSpaceHeld = true;
 
-      if(codeEditor->cursorColumn <= indentCount) indentCount--;
+      if(codeEditor->cursorColumn <= indentCount) indentCount -= removed;
     } else {
       backSpaceHoldTime += GetFrameTime();
       backSpaceRepeatTimer -= GetFrameTime();
 
       if(backSpaceRepeatTimer <= 0.0f){
-        BackSpace(codeEditor->cursor);
-        codeEditor->cursor--;
+        int32_t removed = SmartBackspace(codeEditor);
         
         backSpaceRepeatTimer = 0.05f;
 
-        if(codeEditor->cursorColumn <= indentCount) indentCount--;
+        if(codeEditor->cursorColumn <= indentCount) indentCount -= removed;
       }
     }
     if(indentCount < 0) indentCount = 0;
@@ -540,8 +569,8 @@ void DrawEditor(void){
   int32_t posx = 100;
   char printLine[32];
   char printToken[32];
-  sprintf(printLine, "Line %d", sections.codeEditor[sections.sectionCurrent].cursorLine+1);
-  sprintf(printToken, "%d/%d", tokenCount, TOKENLIMIT);
+  snprintf(printLine, sizeof(printLine), "Line %d", sections.codeEditor[sections.sectionCurrent].cursorLine+1);
+  snprintf(printToken, sizeof(printToken), "%d/%d", tokenCount, TOKENLIMIT);
   DrawSomeText(printLine, (Vector2){1,121});
  
   // count the digit 
@@ -718,35 +747,250 @@ static int isSymbol(const char c){
 // inserting characters
 static void InsertCharacter(int32_t pos, char c){
   CodeEditor *codeEditor = &sections.codeEditor[sections.sectionCurrent];
+  if(!codeEditor) return;
 
-  if(codeEditor->codeCount+1 > codeEditor->codeSize){
-    codeEditor->codeSize += TEXTSIZE;
-    codeEditor->code = realloc(codeEditor->code, sizeof(codeEditor->codeSize));
+  // clamp pos to valid range [0, codeCount]
+  if(pos < 0) pos = 0;
+  if(pos > codeEditor->codeCount) pos = codeEditor->codeCount;
 
-    if(!codeEditor->code){
+  // Ensure we have space for new char plus terminating NUL
+  if(codeEditor->codeCount + 2 > codeEditor->codeSize){
+    size_t newSize = codeEditor->codeSize + TEXTSIZE;
+    char *tmp = realloc(codeEditor->code, newSize);
+    if(!tmp){
       printf("Memory Reallocation for code failed\n");
       return;
     }
-  } 
+    codeEditor->code = tmp;
+    codeEditor->codeSize = (int32_t)newSize;
+  }
 
-  for(int32_t i=codeEditor->codeCount;i>=pos;i--){
+  // shift right including the terminating NUL so the buffer remains NUL-terminated
+  for(int32_t i = codeEditor->codeCount; i >= pos; i--){
     codeEditor->code[i + 1] = codeEditor->code[i];
   }
 
   codeEditor->code[pos] = c;
   codeEditor->codeCount++;
+  // ensure NUL termination after insert
+  codeEditor->code[codeEditor->codeCount] = '\0';
 }
 
-// backspacing characters
-static void BackSpace(int32_t pos){
+static void DeleteCharacterAt(int32_t pos){
   CodeEditor *codeEditor = &sections.codeEditor[sections.sectionCurrent];
+  if(!codeEditor) return;
+  if(pos < 0 || pos >= codeEditor->codeCount) return;
 
-  if(pos <= 0) return;
-
-  for(int32_t i=pos-1;i<codeEditor->codeCount;i++){
+  for(int32_t i = pos; i < codeEditor->codeCount; i++){
     codeEditor->code[i] = codeEditor->code[i + 1];
   }
   codeEditor->codeCount--;
+  if(codeEditor->codeCount < 0) codeEditor->codeCount = 0;
+  codeEditor->code[codeEditor->codeCount] = '\0';
+}
+
+static int32_t SmartBackspace(CodeEditor *codeEditor){
+  if(!codeEditor || codeEditor->cursor <= 0) return 0;
+  if(selecting){
+    DeleteSelection(codeEditor);
+    return 1;
+  }
+
+  int32_t lineStart = GetLineStart(codeEditor, codeEditor->cursor);
+  int32_t column = codeEditor->cursor - lineStart;
+  bool inLeadingSpaces = true;
+  for(int32_t i = lineStart; i < codeEditor->cursor; i++){
+    if(codeEditor->code[i] != ' '){
+      inLeadingSpaces = false;
+      break;
+    }
+  }
+
+  int32_t removeCount = 1;
+  if(inLeadingSpaces && column > 0){
+    removeCount = column % TABSIZE;
+    if(removeCount == 0) removeCount = TABSIZE;
+    if(removeCount > column) removeCount = column;
+  }
+
+  for(int32_t i = 0; i < removeCount; i++){
+    DeleteCharacterAt(codeEditor->cursor - 1);
+    codeEditor->cursor--;
+  }
+  return removeCount;
+}
+
+static int32_t GetLineStart(CodeEditor *codeEditor, int32_t pos){
+  if(!codeEditor) return 0;
+  if(pos < 0) pos = 0;
+  if(pos > codeEditor->codeCount) pos = codeEditor->codeCount;
+
+  while(pos > 0 && codeEditor->code[pos - 1] != '\n') pos--;
+  return pos;
+}
+
+static int32_t GetLineEnd(CodeEditor *codeEditor, int32_t pos){
+  if(!codeEditor) return 0;
+  if(pos < 0) pos = 0;
+  if(pos > codeEditor->codeCount) pos = codeEditor->codeCount;
+
+  while(pos < codeEditor->codeCount && codeEditor->code[pos] != '\n') pos++;
+  return pos;
+}
+
+static int32_t GetLineLeadingSpaces(CodeEditor *codeEditor, int32_t lineStart){
+  int32_t count = 0;
+  if(!codeEditor) return 0;
+
+  while(lineStart + count < codeEditor->codeCount && codeEditor->code[lineStart + count] == ' ') count++;
+  return count;
+}
+
+static bool IsWordBoundary(char c){
+  return !(isalnum((unsigned char)c) || c == '_');
+}
+
+static bool LineEndsWithWord(const char *line, int32_t len, const char *word){
+  int32_t wordLen = (int32_t)strlen(word);
+  if(len < wordLen) return false;
+  if(strncmp(line + len - wordLen, word, wordLen) != 0) return false;
+  return len == wordLen || IsWordBoundary(line[len - wordLen - 1]);
+}
+
+static bool LineStartsWithWord(const char *line, int32_t len, const char *word){
+  int32_t wordLen = (int32_t)strlen(word);
+  if(len < wordLen) return false;
+  if(strncmp(line, word, wordLen) != 0) return false;
+  return len == wordLen || IsWordBoundary(line[wordLen]);
+}
+
+static bool LineHasWord(const char *line, int32_t len, const char *word){
+  int32_t wordLen = (int32_t)strlen(word);
+  for(int32_t i = 0; i <= len - wordLen; i++){
+    if(strncmp(line + i, word, wordLen) != 0) continue;
+    bool leftOk = i == 0 || IsWordBoundary(line[i - 1]);
+    bool rightOk = i + wordLen == len || IsWordBoundary(line[i + wordLen]);
+    if(leftOk && rightOk) return true;
+  }
+  return false;
+}
+
+static bool LineOpensBlock(CodeEditor *codeEditor, int32_t lineStart, int32_t lineEnd){
+  char line[256];
+  int32_t len = 0;
+  if(!codeEditor) return false;
+
+  while(lineStart < lineEnd && codeEditor->code[lineStart] == ' ') lineStart++;
+  while(lineEnd > lineStart && codeEditor->code[lineEnd - 1] == ' ') lineEnd--;
+
+  for(int32_t i = lineStart; i < lineEnd && len < (int32_t)sizeof(line) - 1; i++){
+    if(codeEditor->code[i] == '-' && i + 1 < lineEnd && codeEditor->code[i + 1] == '-') break;
+    line[len++] = (char)tolower((unsigned char)codeEditor->code[i]);
+  }
+  while(len > 0 && line[len - 1] == ' ') len--;
+  line[len] = '\0';
+  if(len <= 0) return false;
+
+  return LineEndsWithWord(line, len, "then") ||
+         LineEndsWithWord(line, len, "do") ||
+         LineEndsWithWord(line, len, "else") ||
+         LineEndsWithWord(line, len, "repeat") ||
+         LineStartsWithWord(line, len, "function") ||
+         (LineStartsWithWord(line, len, "local") && LineHasWord(line, len, "function"));
+}
+
+static void InsertSpacesAtCursor(CodeEditor *codeEditor, int32_t count){
+  if(!codeEditor) return;
+  for(int32_t i = 0; i < count; i++){
+    InsertCharacter(codeEditor->cursor, ' ');
+    codeEditor->cursor++;
+  }
+}
+
+static bool GetNormalizedSelection(int32_t *start, int32_t *end){
+  if(!selecting) return false;
+
+  *start = select_start;
+  *end = select_end;
+  if(*start > *end){
+    int32_t temp = *start;
+    *start = *end;
+    *end = temp;
+  }
+  return *start != *end;
+}
+
+static void DeleteSelection(CodeEditor *codeEditor){
+  int32_t start;
+  int32_t end;
+  if(!codeEditor || !GetNormalizedSelection(&start, &end)) return;
+
+  for(int32_t i = start; i < end; i++) DeleteCharacterAt(start);
+  codeEditor->cursor = start;
+  selecting = false;
+  select_start = start;
+  select_end = start;
+}
+
+static void IndentSelectedLines(CodeEditor *codeEditor){
+  int32_t start;
+  int32_t end;
+  if(!codeEditor || !GetNormalizedSelection(&start, &end)) return;
+
+  int32_t pos = GetLineStart(codeEditor, start);
+  while(pos <= end && pos <= codeEditor->codeCount){
+    for(int32_t i = 0; i < TABSIZE; i++) InsertCharacter(pos + i, ' ');
+    if(codeEditor->cursor >= pos) codeEditor->cursor += TABSIZE;
+    if(select_start >= pos) select_start += TABSIZE;
+    if(select_end >= pos) select_end += TABSIZE;
+    end += TABSIZE;
+
+    pos = GetLineEnd(codeEditor, pos + TABSIZE);
+    if(pos >= codeEditor->codeCount || pos >= end) break;
+    pos++;
+  }
+}
+
+static void UnindentSelectedLines(CodeEditor *codeEditor){
+  int32_t start;
+  int32_t end;
+  if(!codeEditor || !GetNormalizedSelection(&start, &end)) return;
+
+  int32_t pos = GetLineStart(codeEditor, start);
+  while(pos <= end && pos < codeEditor->codeCount){
+    int32_t removed = 0;
+    while(removed < TABSIZE && pos < codeEditor->codeCount && codeEditor->code[pos] == ' '){
+      DeleteCharacterAt(pos);
+      removed++;
+      if(codeEditor->cursor > pos) codeEditor->cursor--;
+      if(select_start > pos) select_start--;
+      if(select_end > pos) select_end--;
+      end--;
+    }
+
+    pos = GetLineEnd(codeEditor, pos);
+    if(pos >= codeEditor->codeCount || pos >= end) break;
+    pos++;
+  }
+}
+
+static void SmartIndentCurrentLine(CodeEditor *codeEditor){
+  if(!codeEditor) return;
+  InsertSpacesAtCursor(codeEditor, TABSIZE);
+  selecting = false;
+}
+
+static void SmartUnindentCurrentLine(CodeEditor *codeEditor){
+  if(!codeEditor) return;
+
+  int32_t lineStart = GetLineStart(codeEditor, codeEditor->cursor);
+  int32_t removed = 0;
+  while(removed < TABSIZE && lineStart < codeEditor->codeCount && codeEditor->code[lineStart] == ' '){
+    DeleteCharacterAt(lineStart);
+    removed++;
+    if(codeEditor->cursor > lineStart) codeEditor->cursor--;
+  }
+  selecting = false;
 }
 
 // NOTE: FIX THIS SOON

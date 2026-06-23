@@ -51,6 +51,12 @@ static void DrawSpriteLabel(Vector2 position);
 static void GetMouseClick(Vector2 position, int32_t width, int32_t height, SprUIClicked sprUI, int32_t index);
 static void CopyToClipboard(int32_t rect_sx, int32_t rect_sy, int32_t rect_w, int32_t rect_h);
 static void PasteFromClipboard(int32_t dst_sx, int32_t dst_sy);
+static void DrawSpriteRectBox(int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, int8_t drawColor, Rectangle clip);
+static void DrawSpriteRectPreview(Vector2 position, int32_t gridSize, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy);
+static void DrawSpriteCircleBox(int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, int8_t drawColor, Rectangle clip);
+static void DrawSpriteCirclePreview(Vector2 position, int32_t gridSize, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy);
+static void DrawSpriteLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int8_t drawColor, Rectangle clip);
+static void DrawSpriteLinePreview(Vector2 position, int32_t gridSize, int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
 Tools toolClicked;                 // current tool used 
 static int32_t colorIndex = 7;
@@ -68,6 +74,109 @@ static NanoButton spriteViewerPage;
 
 int8_t *GetSprite(void){
   return sprites; 
+}
+
+static bool SpritePointInClip(int32_t px, int32_t py, Rectangle clip){
+  return px >= clip.x && px < clip.x + clip.width && py >= clip.y && py < clip.y + clip.height;
+}
+
+static void DrawSpritePreviewPixel(Vector2 position, int32_t gridSize, int32_t px, int32_t py){
+  int32_t spriteSize = TILESIZE * spriteEditor.zoom;
+  if(px < 0 || px >= spriteSize || py < 0 || py >= spriteSize) return;
+  DrawRectangle((position.x + px * gridSize)*SCREENSCALE, (position.y + py * gridSize)*SCREENSCALE, gridSize*SCREENSCALE, gridSize*SCREENSCALE, GetNanoColor(8));
+}
+
+static void DrawSpriteRectBox(int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, int8_t drawColor, Rectangle clip){
+  for(int32_t py = miny; py <= maxy; py++){
+    for(int32_t px = minx; px <= maxx; px++){
+      if(SpritePointInClip(px, py, clip))
+        sprites[py * SPRITEWIDTH + px] = drawColor;
+    }
+  }
+}
+
+static void DrawSpriteRectPreview(Vector2 position, int32_t gridSize, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy){
+  for(int32_t py = miny; py <= maxy; py++){
+    for(int32_t px = minx; px <= maxx; px++){
+      DrawSpritePreviewPixel(position, gridSize, px, py);
+    }
+  }
+}
+
+static bool SpriteCircleBoxHasPixel(int32_t px, int32_t py, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy){
+  int32_t w = maxx - minx + 1;
+  int32_t h = maxy - miny + 1;
+
+  if(w <= 1 && h <= 1) return px == minx && py == miny;
+  if(w <= 1) return px == minx && py >= miny && py <= maxy;
+  if(h <= 1) return py == miny && px >= minx && px <= maxx;
+
+  double cx = (minx + maxx) * 0.5;
+  double cy = (miny + maxy) * 0.5;
+  double rx = (w - 1) * 0.5;
+  double ry = (h - 1) * 0.5;
+  double dx = (px - cx) / rx;
+  double dy = (py - cy) / ry;
+  double d = dx * dx + dy * dy;
+  double edge = 1.0 / ((rx < ry) ? rx : ry);
+
+  return d >= 1.0 - edge && d <= 1.0 + edge;
+}
+
+static void DrawSpriteCircleBox(int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, int8_t drawColor, Rectangle clip){
+  for(int32_t py = miny; py <= maxy; py++){
+    for(int32_t px = minx; px <= maxx; px++){
+      if(!SpritePointInClip(px, py, clip)) continue;
+      if(SpriteCircleBoxHasPixel(px, py, minx, miny, maxx, maxy))
+        sprites[py * SPRITEWIDTH + px] = drawColor;
+    }
+  }
+}
+
+static void DrawSpriteCirclePreview(Vector2 position, int32_t gridSize, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy){
+  for(int32_t py = miny; py <= maxy; py++){
+    for(int32_t px = minx; px <= maxx; px++){
+      if(SpriteCircleBoxHasPixel(px, py, minx, miny, maxx, maxy))
+        DrawSpritePreviewPixel(position, gridSize, px, py);
+    }
+  }
+}
+
+static void DrawSpriteLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int8_t drawColor, Rectangle clip){
+  int32_t dx = abs(x1 - x0);
+  int32_t sxl = x0 < x1 ? 1 : -1;
+  int32_t dy = -abs(y1 - y0);
+  int32_t syl = y0 < y1 ? 1 : -1;
+  int32_t err = dx + dy;
+  int32_t cx = x0;
+  int32_t cy = y0;
+
+  while(1){
+    if(SpritePointInClip(cx, cy, clip))
+      sprites[cy * SPRITEWIDTH + cx] = drawColor;
+    if(cx == x1 && cy == y1) break;
+    int32_t e2 = 2 * err;
+    if(e2 >= dy){ err += dy; cx += sxl; }
+    if(e2 <= dx){ err += dx; cy += syl; }
+  }
+}
+
+static void DrawSpriteLinePreview(Vector2 position, int32_t gridSize, int32_t x0, int32_t y0, int32_t x1, int32_t y1){
+  int32_t dx = abs(x1 - x0);
+  int32_t sxl = x0 < x1 ? 1 : -1;
+  int32_t dy = -abs(y1 - y0);
+  int32_t syl = y0 < y1 ? 1 : -1;
+  int32_t err = dx + dy;
+  int32_t cx = x0;
+  int32_t cy = y0;
+
+  while(1){
+    DrawSpritePreviewPixel(position, gridSize, cx, cy);
+    if(cx == x1 && cy == y1) break;
+    int32_t e2 = 2 * err;
+    if(e2 >= dy){ err += dy; cx += sxl; }
+    if(e2 <= dx){ err += dx; cy += syl; }
+  }
 }
 
 void SpriteInit(void){
@@ -117,9 +226,11 @@ void SpriteFree(void){
 
   for(int32_t i=0;i<16*16;i++){
     free(spriteFlags[i].flags);
+    spriteFlags[i].flags = NULL;
   }
 
   if(clipboard.data) free(clipboard.data);
+  clipboard.data = NULL;
 
   // free undo/redo stack
   UndoFree();
@@ -156,9 +267,9 @@ void SpriteUpdate(void){
             // cycle shape mode
             shapeMode = (shapeMode + 1) % 3;
             switch(shapeMode){
-              case 0: sprintf(labelname, "Shape: Rectangle"); break;
-              case 1: sprintf(labelname, "Shape: Circle"); break;
-              case 2: sprintf(labelname, "Shape: Line"); break;
+                case 0: snprintf(labelname, sizeof(labelname), "Shape: Rectangle"); break;
+                case 1: snprintf(labelname, sizeof(labelname), "Shape: Circle"); break;
+                case 2: snprintf(labelname, sizeof(labelname), "Shape: Line"); break;
             } 
           }
         } else {
@@ -188,47 +299,47 @@ void SpriteUpdate(void){
     case SPR_UI_TOOLS: 
       if(hoveredIndex >= 0 && hoveredIndex < TOOL_COUNT)
         switch(hoveredIndex){
-          case TOOL_PEN:
-            sprintf(labelname, "Pen");
+            case TOOL_PEN:
+            snprintf(labelname, sizeof(labelname), "Pen");
             break;
           case TOOL_SELECT:
-            sprintf(labelname, "Select - not working yet");
+            snprintf(labelname, sizeof(labelname), "Select - not working yet");
             break;
           case TOOL_PAN:
-            sprintf(labelname, "Pan - not working yet");
+            snprintf(labelname, sizeof(labelname), "Pan - not working yet");
             break;
           case TOOL_FILL:
-            sprintf(labelname, "Fill");
+            snprintf(labelname, sizeof(labelname), "Fill");
             break;
           case TOOL_SHAPE:
-            if(shapeMode == 0) sprintf(labelname, "Shape: Rect");
-            else if(shapeMode == 1) sprintf(labelname, "Shape: Circle");
-            else sprintf(labelname, "Shape: Line");
+            if(shapeMode == 0) snprintf(labelname, sizeof(labelname), "Shape: Rect");
+            else if(shapeMode == 1) snprintf(labelname, sizeof(labelname), "Shape: Circle");
+            else snprintf(labelname, sizeof(labelname), "Shape: Line");
             break;
         }
       break;
     case SPR_UI_COLOR:
       if(hoveredIndex >= 0 && hoveredIndex < COLORCOUNT)
-        sprintf(labelname, "Color %d", hoveredIndex);
+        snprintf(labelname, sizeof(labelname), "Color %d", hoveredIndex);
       break;
     case SPR_UI_PENSIZE:
       if(hoveredIndex >= 0 && hoveredIndex < COLORCOUNT)
-        sprintf(labelname, "Pen size %d", hoveredIndex);
+        snprintf(labelname, sizeof(labelname), "Pen size %d", hoveredIndex);
       break;
     case SPR_UI_ZOOMSIZE:
       if(hoveredIndex >= 0 && hoveredIndex < COLORCOUNT)
-        sprintf(labelname, "Zoom size %d", hoveredIndex);
+        snprintf(labelname, sizeof(labelname), "Zoom size %d", hoveredIndex);
       break;
     case SPR_UI_FLAGS:
       if(hoveredIndex >= 0 && hoveredIndex < COLORCOUNT)
-        sprintf(labelname, "Flag %d = %s", hoveredIndex, (spriteFlags[spriteEditor.activeSpriteIndex].flags[hoveredIndex]) ? "On" : "Off");
+        snprintf(labelname, sizeof(labelname), "Flag %d = %s", hoveredIndex, (spriteFlags[spriteEditor.activeSpriteIndex].flags[hoveredIndex]) ? "On" : "Off");
       break;
     case SPR_UI_EDITOR:
       if(hoveredIndex >= 0 && hoveredIndex < COLORCOUNT)
-        sprintf(labelname, "X: %d Y: %d", (int32_t)spriteEditor.position.x, (int32_t)spriteEditor.position.y);
+        snprintf(labelname, sizeof(labelname), "X: %d Y: %d", (int32_t)spriteEditor.position.x, (int32_t)spriteEditor.position.y);
       break;
     default:
-      sprintf(labelname, " ");
+      snprintf(labelname, sizeof(labelname), " ");
       break;
   }
 }
@@ -494,49 +605,18 @@ static void UpdateSpriteEditor(Vector2 position){
           int32_t miny = (y0 < y1) ? y0 : y1;
           int32_t maxx = (x0 > x1) ? x0 : x1;
           int32_t maxy = (y0 > y1) ? y0 : y1;
+          Rectangle spriteClip = {
+            sx + (int32_t)spritePan.x,
+            sy + (int32_t)spritePan.y,
+            spriteSize,
+            spriteSize
+          };
           if(shapeMode == 0){
-            // rect fill
-            for(int32_t py = miny; py <= maxy; py++){
-              for(int32_t px = minx; px <= maxx; px++){
-                if(px < 0 || px >= SPRITEWIDTH || py < 0 || py >= SPRITEHEIGHT) continue;
-                sprites[py * SPRITEWIDTH + px] = colorIndex;
-              }
-            }
+            DrawSpriteRectBox(minx, miny, maxx, maxy, colorIndex, spriteClip);
           } else if(shapeMode == 1){
-            // circle fill within bounding box
-            float cx = (minx + maxx) * 0.5f;
-            float cy = (miny + maxy) * 0.5f;
-            float rx = (maxx - minx) * 0.5f;
-            float ry = (maxy - miny) * 0.5f;
-            float r = (rx > ry) ? rx : ry;
-            float rr = r * r;
-            for(int32_t py = miny; py <= maxy; py++){
-              for(int32_t px = minx; px <= maxx; px++){
-                float dx = px - cx;
-                float dy = py - cy;
-                if(dx*dx + dy*dy <= rr){
-                  if(px < 0 || px >= SPRITEWIDTH || py < 0 || py >= SPRITEHEIGHT) continue;
-                  sprites[py * SPRITEWIDTH + px] = colorIndex;
-                }
-              }
-            }
+            DrawSpriteCircleBox(minx, miny, maxx, maxy, colorIndex, spriteClip);
           } else {
-            // line (Bresenham)
-            int32_t dx = abs(x1 - x0);
-            int32_t sxl = x0 < x1 ? 1 : -1;
-            int32_t dy = -abs(y1 - y0);
-            int32_t syl = y0 < y1 ? 1 : -1;
-            int32_t err = dx + dy;
-            int32_t cx0 = x0;
-            int32_t cy0 = y0;
-            while(1){
-              if(cx0 >= 0 && cx0 < SPRITEWIDTH && cy0 >= 0 && cy0 < SPRITEHEIGHT)
-                sprites[cy0 * SPRITEWIDTH + cx0] = colorIndex;
-              if(cx0 == x1 && cy0 == y1) break;
-              int32_t e2 = 2*err;
-              if(e2 >= dy){ err += dy; cx0 += sxl; }
-              if(e2 <= dx){ err += dx; cy0 += syl; }
-            }
+            DrawSpriteLine(x0, y0, x1, y1, colorIndex, spriteClip);
           }
           shaping = 0;
         }
@@ -633,22 +713,16 @@ static void DrawSpriteEditor(Vector2 position, int32_t size){
 
     switch(shapeMode){
       case 0: // rect preview
-        DrawRectangleLines((position.x + minx * gridSize)*SCREENSCALE, (position.y + miny * gridSize)*SCREENSCALE, (maxx-minx+1) * gridSize * SCREENSCALE, (maxy-miny+1) * gridSize * SCREENSCALE, GetNanoColor(8));
+        DrawSpriteRectPreview(position, gridSize, minx, miny, maxx, maxy);
         break;
       case 1: // circle preview
         {
-          int32_t w = (maxx-minx+1) * gridSize * SCREENSCALE;
-          int32_t h = (maxy-miny+1) * gridSize * SCREENSCALE;
-          DrawRectangleLines((position.x + minx * gridSize)*SCREENSCALE, (position.y + miny * gridSize)*SCREENSCALE, w, h, GetNanoColor(8));
+          DrawSpriteCirclePreview(position, gridSize, minx, miny, maxx, maxy);
         }
         break;
       case 2: // line preview
         {
-          int32_t x0 = (position.x + relStartX * gridSize) * SCREENSCALE + gridSize*SCREENSCALE/2;
-          int32_t y0 = (position.y + relStartY * gridSize) * SCREENSCALE + gridSize*SCREENSCALE/2;
-          int32_t x1 = (position.x + curX * gridSize) * SCREENSCALE + gridSize*SCREENSCALE/2;
-          int32_t y1 = (position.y + curY * gridSize) * SCREENSCALE + gridSize*SCREENSCALE/2;
-          DrawLine(x0, y0, x1, y1, GetNanoColor(8));
+          DrawSpriteLinePreview(position, gridSize, relStartX, relStartY, curX, curY);
         }
         break;
     }
@@ -773,7 +847,7 @@ void DrawSpriteIndex(Vector2 position){
   int32_t scalex = FONTWIDTH*8;
   int32_t scaley = FONTHEIGHT + FONTHEIGHT/2;
   char spriteIndexText[32];
-  sprintf(spriteIndexText, "SPR=%d\n", spriteEditor.activeSpriteIndex);
+  snprintf(spriteIndexText, sizeof(spriteIndexText), "SPR=%d\n", spriteEditor.activeSpriteIndex);
   DrawTextUI(spriteIndexText, (Vector2){position.x+(scalex-FONTWIDTH*7)/2, position.y+(scaley-FONTHEIGHT)/2});
 }
 
@@ -883,7 +957,7 @@ void DrawSpriteSheetTabs(Vector2 position){
   for(int32_t i=0;i<4;i++){
     if(i == currentPage) 
       DrawRectangle((position.x+(i*(TILESIZE+1)))*SCREENSCALE, position.y*SCREENSCALE, TILESIZE*SCREENSCALE, TILESIZE*SCREENSCALE, GetNanoColor(color));
-    sprintf(text, "%d", i);
+    snprintf(text, sizeof(text), "%d", i);
     DrawTextUI(text,(Vector2){position.x+2+(i*(TILESIZE+1)), position.y+1});
   }
 }

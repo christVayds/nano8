@@ -63,10 +63,7 @@ typedef struct{
   bool playing;
   int32_t currentStep;
   int32_t sfxIndex;
-  int32_t timer;
-  
-  int32_t rampDownSamples;
-  int32_t rampSamples;
+  int32_t timer; 
   Synth synth;
 } SFXPlayer;
 

@@ -96,24 +96,24 @@ void MapUpdate(void){
       if(hoveredIndex >= 0 && hoveredIndex < TOOL_COUNT)
         switch(hoveredIndex){
           case TOOL_PEN:
-            sprintf(labelname, "Pen");
+            snprintf(labelname, sizeof(labelname), "Pen");
             break;
           case TOOL_SELECT:
-            sprintf(labelname, "Select - bug");
+            snprintf(labelname, sizeof(labelname), "Select - bug");
             break;
           case TOOL_PAN:
-            sprintf(labelname, "Pan");
+            snprintf(labelname, sizeof(labelname), "Pan");
             break;
           case TOOL_FILL:
-            sprintf(labelname, "Fill");
+            snprintf(labelname, sizeof(labelname), "Fill");
             break;
           case TOOL_SHAPE:
-            sprintf(labelname, "Shapes - nah");
+            snprintf(labelname, sizeof(labelname), "Shapes - nah");
             break;
         }
       break;
     default:
-      sprintf(labelname, " ");
+      snprintf(labelname, sizeof(labelname), " ");
       break;
   }
 }
@@ -366,9 +366,9 @@ static void UpdateMapEditor(Vector2 position){
     if(IsKeyPressed(KEY_S)){
       mapShapeMode = (mapShapeMode + 1) % 3;
       switch(mapShapeMode){
-        case 0: sprintf(labelname, "Shape: Rect"); break;
-        case 1: sprintf(labelname, "Shape: Circle"); break;
-        case 2: sprintf(labelname, "Shape: Line"); break;
+        case 0: snprintf(labelname, sizeof(labelname), "Shape: Rect"); break;
+        case 1: snprintf(labelname, sizeof(labelname), "Shape: Circle"); break;
+        case 2: snprintf(labelname, sizeof(labelname), "Shape: Line"); break;
       }
     }
 

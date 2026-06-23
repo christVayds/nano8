@@ -76,6 +76,7 @@ int l_print(lua_State *L){
   int posy = luaL_optnumber(L, 3, position.y); // default is 0
   
   int colorIndex = luaL_optinteger(L, 4, 7); // default color is white 
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
 
   // print/display the text 
   position.x = posx;
@@ -93,6 +94,7 @@ int l_pset(lua_State *L){
   int posx = luaL_optnumber(L, 1, 0);
   int posy = luaL_optnumber(L, 2, 0);
   int colorIndex = luaL_optnumber(L, 3, 0);
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
   pset(posx, posy, colorIndex);
 
   return 0;
@@ -126,6 +128,7 @@ int l_line(lua_State *L){
   int posx2 = luaL_optnumber(L, 3, 0);
   int posy2 = luaL_optnumber(L, 4, 0);
   int colorIndex = luaL_optnumber(L, 5, 7);
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
   
   DrawScreenLine(posx1, posy1, posx2, posy2, colorIndex);
 
@@ -138,6 +141,7 @@ int l_rect(lua_State *L){
   int width = luaL_optnumber(L, 3, 0);
   int height = luaL_optnumber(L, 4, 0);
   int colorIndex = luaL_optnumber(L, 5, 7);
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
 
   DrawScreenLine(posx, posy, posx + width, posy, colorIndex);
   DrawScreenLine(posx, posy, posx, posy + height, colorIndex);
@@ -153,6 +157,7 @@ int l_rectfill(lua_State *L){
   int width = luaL_optnumber(L, 3, 0);
   int height = luaL_optnumber(L, 4, 0);
   int colorIndex = luaL_optnumber(L, 5, 7);
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
 
   DrawRectFill(posx, posy, width, height, colorIndex);
   return 0;
@@ -163,7 +168,8 @@ int l_circfill(lua_State *L){
   int cy = luaL_optnumber(L, 2, 0);
   int radius = luaL_optnumber(L, 3, 0);
   int colorIndex = luaL_optnumber(L, 4, 7);
-  
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
+
   DrawCircFill(cx, cy, radius, colorIndex);
 
   return 0;
@@ -174,6 +180,7 @@ int l_circ(lua_State *L){
   int cy = luaL_optnumber(L, 2, 0);
   int radius = luaL_optnumber(L, 3, 0);
   int colorIndex = luaL_optnumber(L, 4, 7);
+  if(colorIndex > COLORCOUNT) colorIndex = COLORCOUNT-1;
   
   DrawCirc(cx, cy, radius, colorIndex);
 
@@ -299,7 +306,9 @@ int l_cursor(lua_State *L){
 int l_pal(lua_State *L){
   int oldColor = luaL_optnumber(L, 1, 0);
   int newColor = luaL_optnumber(L, 2, 0);
-  Pal(oldColor, newColor);
+  if(oldColor < COLORCOUNT && newColor < COLORCOUNT)
+    Pal(oldColor, newColor);
+  else Pal(0, 0); // or maybe raise an error 
 
   return 0;
 }
@@ -309,8 +318,9 @@ int l_palt(lua_State *L){
   if(!argc){
     Palt(0, 0, true);
   } else {
-    int color = luaL_checknumber(L, 1);
+    int color = luaL_checknumber(L, 1); 
     int set = lua_toboolean(L, 2);
+    if(color > COLORCOUNT) color = COLORCOUNT-1;
     Palt(color, set, false);
   }
 

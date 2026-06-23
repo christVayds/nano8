@@ -2,6 +2,7 @@
 
 #include "editor.h"
 #include "sprite.h"
+#include "sfx.h"
 #include "maps.h"
 
 #include <string.h>
@@ -10,6 +11,7 @@
 
 extern int8_t sprites[SPRITEWIDTH*SPRITEHEIGHT];
 extern int8_t mapData[MAPWIDTH*MAPHEIGHT];
+extern SFX sfxs[MAX_SFX];
 
 static int32_t HexToInt(char c);
 
@@ -52,6 +54,23 @@ void SaveCartridge(const char* filename){
 
   // SFX 
   fprintf(fp, "__SFX__\n\n");
+  // Save SFX data
+  // Format per-line per SFX:
+  // [speed:2hex][loopStart:2hex][loopEnd:2hex][note0:PPWVE][note1:PPWVE]...
+  // where each note is: PP = pitch (2 hex chars, 00-3F), W = waveform (1 hex),
+  // V = volume (1 hex), E = effect (1 hex). MAX_NOTES notes are written per SFX.
+  // Example: "010002003F40A3...\n"
+  for(int32_t s=0;s<MAX_SFX;s++){
+    // write sfx header: speed, loopStart, loopEnd (each 1 byte -> 2 hex chars)
+    fprintf(fp, "%02X%02X%02X", sfxs[s].speed & 0xFF, sfxs[s].loopStart & 0xFF, sfxs[s].loopEnd & 0xFF);
+
+    // write each note: pitch (2 hex), waveform (1 hex), volume (1 hex), effect (1 hex)
+    for(int32_t n=0;n<MAX_NOTES;n++){
+      SFXNote note = sfxs[s].notes[n];
+      fprintf(fp, "%02X%X%X%X", note.pitch & 0xFF, (int)note.waveform & 0xF, note.volume & 0xF, (int)note.effect & 0xF);
+    }
+    fprintf(fp, "\n");
+  }
 
   // MUSIC
   fprintf(fp, "__MUSIC__\n\n");
@@ -118,8 +137,12 @@ bool LoadCartridge(const char* filename){
         for(int32_t i=0;i<COLORCOUNT;i++){
           fgets(line, sizeof(line), fp);
           unsigned int r, g, b;
-          sscanf(line, "%02X%02X%02X", &r, &g, &b);
-          SetNanoColor(i, r, g, b);
+          if(sscanf(line, "%02X%02X%02X", &r, &g, &b) == 3){
+            SetNanoColor(i, r, g, b);
+          } else {
+            // malformed line, skip or set default
+            SetNanoColor(i, 0, 0, 0);
+          }
         }
         break;
       case CART_SPRITES:{
@@ -163,6 +186,45 @@ bool LoadCartridge(const char* filename){
       }
         break;
       case CART_SFX:
+        // Load SFX data
+        // Expected format (matches save): one line per SFX
+        // [speed:2hex][loopStart:2hex][loopEnd:2hex][note0:PPWVE][note1:PPWVE]...
+        // PP = pitch (2 hex chars), W = waveform (1 hex), V = volume (1 hex), E = effect (1 hex)
+        for(int32_t s=0;s<MAX_SFX;s++){
+          if(!fgets(line, sizeof(line), fp)) break;
+
+          // skip empty lines if present
+          if(line[0] == '\n' || line[0] == '\0'){
+            s--; // retry this index
+            continue;
+          }
+
+          int32_t pos = 0;
+          // parse speed, loopStart, loopEnd (each two hex chars)
+          unsigned int speed = (HexToInt(line[pos]) << 4) | HexToInt(line[pos+1]); pos += 2;
+          unsigned int loopStart = (HexToInt(line[pos]) << 4) | HexToInt(line[pos+1]); pos += 2;
+          unsigned int loopEnd = (HexToInt(line[pos]) << 4) | HexToInt(line[pos+1]); pos += 2;
+
+          sfxs[s].speed = (int32_t)speed;
+          sfxs[s].loopStart = (int32_t)loopStart;
+          sfxs[s].loopEnd = (int32_t)loopEnd;
+
+          // parse each note
+          for(int32_t n=0;n<MAX_NOTES;n++){
+            unsigned int pitch = (HexToInt(line[pos]) << 4) | HexToInt(line[pos+1]); pos += 2;
+            unsigned int waveform = HexToInt(line[pos]); pos++;
+            unsigned int volume = HexToInt(line[pos]); pos++;
+            unsigned int effect = HexToInt(line[pos]); pos++;
+
+            SFXNote note = {
+              .pitch = (uint8_t)(pitch & 0xFF),
+              .waveform = (Waveform)(waveform & 0xFF),
+              .volume = (uint8_t)(volume & 0xFF),
+              .effect = (Effects)(effect & 0xFF)
+            };
+            sfxs[s].notes[n] = note;
+          }
+        }
         break;
       case CART_MUSIC:
         break;
